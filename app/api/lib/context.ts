@@ -340,20 +340,34 @@ Each step: 20 words or fewer; remain specific and context-aware.
 
 ## Response Format
 
-ALL output must use markdown:
-- All main section headings: \`##\` 
-- **Bold** key terms, names, companies
-- \`Inline code\` for technical/product names as appropriate
-- Use \`-\` for bullets, \`1. 2. 3.\` for numbered lists (never '1)')
-- Include blank lines for clarity
+CRITICAL: ALL output MUST use proper markdown syntax.
 
-Do NOT use:
-- HTML tags
-- Plain text section names without ##
-- '1)' style lists
-- Emojis in body text (only in status/progress lines)
+**REQUIRED** for every response:
+- \`##\` before EVERY section heading (not plain text)
+- \`**bold**\` for key terms, names, companies
+- \`-\` for bullets, \`1. 2. 3.\` for numbered lists
+- Blank lines between sections
 
-Output lacking markdown, bold text, or this structure is non-compliant and must be corrected.
+**Example of CORRECT formatting:**
+\`\`\`
+## Summary & Recommendation
+
+**Stripe** is a high-value target with **$50B valuation**...
+
+## Why Now (timing & urgency)
+
+- **Recent acquisition**: Acquired **Bridge** for **$1.1B**
+- **Hiring surge**: 200+ new hires in security/compliance
+\`\`\`
+
+**WRONG** (missing ## and bold):
+\`\`\`
+Summary & Recommendation
+
+Stripe is a high-value target with $50B valuation...
+\`\`\`
+
+If your output has plain text headings without ##, it's WRONG. Every section must start with ##.
 
 ---
 `;

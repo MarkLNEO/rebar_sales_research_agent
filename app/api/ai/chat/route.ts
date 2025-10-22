@@ -154,10 +154,13 @@ export async function POST(req: NextRequest) {
               // Try to extract planning checklist from beginning of response
               // Updated to match 🏯 emoji (castle) per OpenAI optimization
               if (!planningExtracted && contentBuffer.length > 50) {
-                const planMatch = contentBuffer.match(/[🎯🏯]\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{20,500}?)\n\n/);
+                // More flexible regex: match planning with various formats
+                const planMatch = contentBuffer.match(/[🎯🏯]\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{10,800}?)(?=\n\n(?:Progress update|Purpose:|##|Checking|$))/);
                 if (planMatch) {
                   planningExtracted = true;
                   const planContent = planMatch[0].trim();
+                  
+                  console.log('[chat] Extracted planning checklist:', planContent.substring(0, 100));
                   
                   // Send planning as reasoning_progress event
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -165,9 +168,9 @@ export async function POST(req: NextRequest) {
                     content: planContent
                   })}\n\n`));
                   
-                  // Continue with content after the plan
+                  // Continue with content AFTER the plan (skip the plan itself)
                   const afterPlan = contentBuffer.substring(planMatch.index! + planMatch[0].length);
-                  if (afterPlan) {
+                  if (afterPlan.trim()) {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                       type: 'content',
                       content: afterPlan
