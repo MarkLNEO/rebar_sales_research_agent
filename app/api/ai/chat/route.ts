@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
             input: lastUserMessage.content,
             text: { format: { type: 'text' } },
             max_output_tokens: 16000,
-            tools: [{ type: 'web_search' }],
+            tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
             reasoning: { effort: 'medium' },
             store: true,
             metadata: {

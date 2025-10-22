@@ -204,7 +204,7 @@ export function SignalSettings() {
           </p>
         </div>
         <div className="flex items-center justify-between">
-          <div className="text-xs text-gray-500">Need inspiration? Try "Funding rounds in defense startups" or "Leadership changes for CIO/CTO".</div>
+          <div className="text-xs text-gray-500">Need inspiration? Try &quot;Funding rounds in defense startups&quot; or &quot;Leadership changes for CIO/CTO&quot;.</div>
           <button
             disabled={extracting || !nlText.trim()}
             onClick={async () => {

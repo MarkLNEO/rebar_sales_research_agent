@@ -965,7 +965,7 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
                 <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg">👋</div>
                 <div className="flex-1">
                   <div className="mb-2">
-                    <div className="text-sm text-gray-900 font-semibold">Hey! I'm your Welcome Agent.</div>
+                    <div className="text-sm text-gray-900 font-semibold">Hey! I&apos;m your Welcome Agent.</div>
                   </div>
                   <div className="text-sm text-gray-700 mb-4">
                     I help sales teams research companies, find hot leads, and track accounts.

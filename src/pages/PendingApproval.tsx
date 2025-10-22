@@ -45,7 +45,7 @@ export function PendingApproval() {
                   What happens next?
                 </p>
                 <p className="text-sm text-blue-700">
-                  We'll review your account and send you an email at <strong>{user?.email}</strong> once you're approved. This usually takes 1-2 business days.
+                  We&apos;ll review your account and send you an email at <strong>{user?.email}</strong> once you&apos;re approved. This usually takes 1-2 business days.
                 </p>
               </div>
             </div>

@@ -1779,7 +1779,7 @@ Onboarding flow:
                             </li>
                           ))
                         ) : (
-                          <li className="text-sm text-emerald-700">This company hasn't been researched yet. Click "Run Research" to generate a comprehensive report.</li>
+                          <li className="text-sm text-emerald-700">This company hasn&apos;t been researched yet. Click &quot;Run Research&quot; to generate a comprehensive report.</li>
                         )}
                       </ul>
                     </div>
@@ -1793,7 +1793,7 @@ Onboarding flow:
                     <div className="flex-1">
                       <h2 className="text-base font-semibold text-blue-900">What the Profile Coach captures for every account</h2>
                       <p className="text-sm text-blue-800 mt-1">
-                        I keep your research configuration transparent so you always know the data points we\'re calibrating against.
+                        I keep your research configuration transparent so you always know the data points we&apos;re calibrating against.
                         Update anything here and future research will align instantly.
                       </p>
                       <ul className="mt-4 grid gap-2 text-sm text-blue-900 sm:grid-cols-2">

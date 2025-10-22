@@ -227,7 +227,7 @@ export function Settings() {
             <Activity className="w-5 h-5 text-purple-700" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">What I'm monitoring for you</h2>
+            <h2 className="text-xl font-semibold text-gray-900">What I&apos;m monitoring for you</h2>
             <p className="text-sm text-gray-600">Complete your profile to unlock RebarHQ&apos;s full potential.</p>
           </div>
         </div>
