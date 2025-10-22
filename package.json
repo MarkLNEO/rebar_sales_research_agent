@@ -13,6 +13,8 @@
     "test:research": "playwright test tests/research.spec.ts",
     "test:onboarding": "playwright test tests/onboarding.spec.ts",
     "test:preferences": "playwright test tests/preferences.spec.ts",
+    "test:profile-coach": "playwright test tests/profile-coach.spec.ts",
+    "test:memory": "playwright test tests/memory.spec.ts",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report"

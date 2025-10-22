@@ -42,3 +42,4 @@ coverage/
 # Old build artifacts (if any remain)
 server-build/
 *.archive
+.playwright-mcp/

@@ -19,9 +19,9 @@ const TEST_SUITES = [
   'tests/onboarding.spec.ts',
   'tests/research.spec.ts',
   'tests/preferences.spec.ts',
+  'tests/profile-coach.spec.ts',
+  'tests/memory.spec.ts',
   // Add more as they're created:
-  // 'tests/profile-coach.spec.ts',
-  // 'tests/memory.spec.ts',
   // 'tests/tracked-accounts.spec.ts',
   // 'tests/bulk-research.spec.ts',
   // 'tests/settings.spec.ts',

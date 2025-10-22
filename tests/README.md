@@ -18,6 +18,8 @@ npm test
 npm run test:research
 npm run test:onboarding
 npm run test:preferences
+npm run test:profile-coach
+npm run test:memory
 
 # Run with UI (interactive mode)
 npm run test:ui
@@ -35,16 +37,16 @@ npm run test:report
 
 ### Test Suites
 
-| Suite | File | Focus |
-|-------|------|-------|
-| **Company Research** | `research.spec.ts` | Quick/Deep/Specific modes, performance, streaming |
-| **Onboarding** | `onboarding.spec.ts` | New user signup, wizard flow, profile setup |
-| **Preferences** | `preferences.spec.ts` | Implicit learning, persistence, JIT prompts |
-| **Profile Coach** | `profile-coach.spec.ts` | Profile updates, ICP config, criteria setup |
-| **Memory & Context** | `memory.spec.ts` | Conversation context, memory persistence |
-| **Tracked Accounts** | `tracked-accounts.spec.ts` | Account tracking, signals, monitoring |
-| **Bulk Research** | `bulk-research.spec.ts` | CSV upload, batch processing, results |
-| **Settings** | `settings.spec.ts` | Settings updates, integrations, billing |
+| Suite | File | Focus | Status |
+|-------|------|-------|--------|
+| **Company Research** | `research.spec.ts` | Quick/Deep/Specific modes, performance, streaming | ✅ 8 tests |
+| **Onboarding** | `onboarding.spec.ts` | New user signup, wizard flow, profile setup | ✅ 6 tests |
+| **Preferences** | `preferences.spec.ts` | Implicit learning, persistence, JIT prompts | ✅ 8 tests |
+| **Profile Coach** | `profile-coach.spec.ts` | Profile updates, ICP config, criteria setup | ✅ 17 tests |
+| **Memory & Context** | `memory.spec.ts` | Conversation context, memory persistence | ✅ 17 tests |
+| **Tracked Accounts** | `tracked-accounts.spec.ts` | Account tracking, signals, monitoring | 📝 Todo |
+| **Bulk Research** | `bulk-research.spec.ts` | CSV upload, batch processing, results | 📝 Todo |
+| **Settings** | `settings.spec.ts` | Settings updates, integrations, billing | 📝 Todo |
 
 ### Parallel Execution
 
@@ -425,8 +427,8 @@ Parse JSON results in CI for:
 
 ## Next Steps
 
-- [ ] Add Profile Coach tests
-- [ ] Add Memory & Context tests
+- [x] Add Profile Coach tests (17 tests)
+- [x] Add Memory & Context tests (17 tests)
 - [ ] Add Tracked Accounts tests
 - [ ] Add Bulk Research tests
 - [ ] Add Settings tests
