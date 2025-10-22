@@ -224,7 +224,7 @@ export function MessageBubble({
         body: JSON.stringify({
           key: pref.key,
           value: pref.value,
-          source: 'explicit', // User explicitly confirmed
+          source: 'followup', // User confirmed from follow-up question
           confidence: 1.0,
         }),
       });
