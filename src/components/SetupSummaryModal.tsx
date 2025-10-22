@@ -162,7 +162,7 @@ export const SetupSummaryModal: FC<SetupSummaryModalProps> = ({ open, loading, d
                     <div className="space-y-2">
                       {data.signalPreferences.map(signal => (
                         <div key={`${signal.signal_type}-${signal.importance}`} className="text-sm">
-                          <span className="font-medium text-gray-900">{signal.signal_type}</span>
+                          <span className="font-medium text-gray-900">{prettyFocus(signal.signal_type)}</span>
                           <span className="text-gray-500 ml-2">• {signal.importance}</span>
                           {typeof signal.lookback_days === 'number' ? (
                             <span className="text-gray-500 ml-2">({signal.lookback_days}d)</span>

@@ -159,10 +159,80 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const { addToast } = useToast();
   const [expanded, setExpanded] = useState(false);
-  const safeContent = content ?? '';
+  const [savingPreference, setSavingPreference] = useState(false);
+
+  // Parse preference capture blocks from AI response
+  const { cleanContent, preferences } = useMemo(() => {
+    const rawContent = content ?? '';
+    const prefRegex = /\[SAVE_PREF\](.+?)\[\/SAVE_PREF\]/g;
+    const detectedPrefs: Array<{ key: string; value: string; label: string }> = [];
+
+    let match;
+    while ((match = prefRegex.exec(rawContent)) !== null) {
+      const block = match[1];
+      const parts = block.split('|');
+      const parsed: Record<string, string> = {};
+
+      parts.forEach(part => {
+        const [k, v] = part.split('=');
+        if (k && v) {
+          parsed[k.trim()] = v.trim();
+        }
+      });
+
+      if (parsed.key && parsed.value && parsed.label) {
+        detectedPrefs.push({
+          key: parsed.key,
+          value: parsed.value,
+          label: parsed.label,
+        });
+      }
+    }
+
+    // Strip preference blocks from content
+    const cleaned = rawContent.replace(prefRegex, '').replace(/💾\s*\*\*Save this preference\?\*\*[\s\S]*?(?=\n#{1,3}\s+|$)/g, '').trim();
+
+    return { cleanContent: cleaned, preferences: detectedPrefs };
+  }, [content]);
+
+  const safeContent = cleanContent;
   const isCompanyResearch = agentType === 'company_research';
   const selectableMode = mode && mode !== 'auto' ? mode : null;
   const isSpecificMode = selectableMode === 'specific';
+
+  // Save preference to database
+  const handleSavePreference = async (pref: { key: string; value: string; label: string }) => {
+    setSavingPreference(true);
+    try {
+      const response = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: pref.key,
+          value: pref.value,
+          source: 'explicit', // User explicitly confirmed
+          confidence: 1.0,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save preference');
+      }
+
+      addToast({
+        type: 'success',
+        message: `Saved: ${pref.label}`,
+      });
+    } catch (error) {
+      console.error('Failed to save preference:', error);
+      addToast({
+        type: 'error',
+        message: 'Failed to save preference. Please try again.',
+      });
+    } finally {
+      setSavingPreference(false);
+    }
+  };
   const icpMeta = useMemo(() => {
     if (!isCompanyResearch || role !== 'assistant' || streaming) return null;
     // Do not show ICP scorecard for draft email content
@@ -677,6 +747,25 @@ export function MessageBubble({
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>
+        </div>
+      )}
+
+      {preferences.length > 0 && role === 'assistant' && !streaming && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 shadow-sm">
+          <div className="text-xs font-semibold text-amber-900 uppercase tracking-wide mb-2">💾 Save this preference?</div>
+          <div className="flex flex-wrap items-center gap-2">
+            {preferences.map((pref, idx) => (
+              <button
+                key={`${pref.key}-${idx}`}
+                type="button"
+                onClick={() => handleSavePreference(pref)}
+                disabled={savingPreference}
+                className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-full hover:bg-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingPreference ? 'Saving...' : pref.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
