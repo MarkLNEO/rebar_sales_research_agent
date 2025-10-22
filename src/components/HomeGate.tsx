@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
-import { ResearchChat } from '../pages/ResearchChat';
+import { ResearchChat } from '../page-components/ResearchChat';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { LoadingGate, type LoadingStep } from './LoadingGate';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { AllSignals } from '@/src/pages/AllSignals';
+import { AllSignals } from '@/src/page-components/AllSignals';
 import { ProtectedRoute } from '@/src/components/ProtectedRoute';
 
 export default function SignalsPage() {
