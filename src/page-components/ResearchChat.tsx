@@ -28,6 +28,7 @@ import { normalizeMarkdown, stripClarifierBlocks } from '../utils/markdown';
 import type { TrackedAccount, AccountStats } from '../services/accountService';
 import { useUserProfile, invalidateUserProfileCache } from '../hooks/useUserProfile';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { usePreferenceTracking } from '../hooks/usePreferenceTracking';
 import { OptimizeICPModal } from '../components/OptimizeICPModal';
 import { useResearchEngine } from '../contexts/ResearchEngineContext';
 import { getDefaultTemplate } from '../config/researchTemplates';
@@ -378,6 +379,9 @@ export function ResearchChat() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addToast } = useToast();
+  
+  // Initialize implicit preference tracking
+  const { track: trackPreference } = usePreferenceTracking(user?.id);
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
