@@ -45,7 +45,7 @@ export async function loadFullUserContext(
   // Check cache first
   const cached = getCachedContext(userId);
   if (cached) {
-    // Rebuild system prompt with cached data (cheap operation)
+    // Rebuild system prompt with cached data (passing cached preferences to avoid duplicate DB call)
     const systemPrompt = await buildSystemPrompt(
       {
         userId: cached.userId,
@@ -54,7 +54,8 @@ export async function loadFullUserContext(
         signals: cached.signals,
         disqualifiers: cached.disqualifiers,
       },
-      agentType
+      agentType,
+      cached.learnedPreferences // Pass cached preferences
     );
 
     return {
@@ -87,8 +88,8 @@ export async function loadFullUserContext(
     })(),
   ]);
 
-  // Build system prompt
-  const systemPrompt = await buildSystemPrompt(userContext, agentType);
+  // Build system prompt with pre-loaded preferences (avoid duplicate DB call)
+  const systemPrompt = await buildSystemPrompt(userContext, agentType, learnedPreferences);
 
   const fullContext: FullUserContext = {
     userId,

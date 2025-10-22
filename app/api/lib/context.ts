@@ -128,17 +128,25 @@ export async function fetchUserContext(supabase: any, userId: string) {
   };
 }
 
-export async function buildSystemPrompt(context: any, agentType = 'company_research'): Promise<string> {
+export async function buildSystemPrompt(
+  context: any,
+  agentType = 'company_research',
+  learnedPreferences?: any // Accept pre-loaded preferences to avoid duplicate DB calls
+): Promise<string> {
   const { userId, profile, customCriteria, signals, disqualifiers } = context;
-  
+
   // Profile Coach gets ultra-concise prompt
   if (agentType === 'settings_agent') {
     return buildProfileCoachPrompt(context);
   }
-  
-  // Fetch learned preferences
+
+  // Use provided learned preferences or fetch them (backward compatibility)
   let learnedPrefsSection = '';
-  if (userId) {
+  if (learnedPreferences) {
+    // Use pre-loaded preferences (cache hit path)
+    learnedPrefsSection = buildLearnedPreferencesSection(learnedPreferences);
+  } else if (userId) {
+    // Fetch preferences (backward compatibility for direct calls)
     try {
       const { getResolvedPreferences } = await import('../../../lib/preferences/store');
       const { resolved } = await getResolvedPreferences(userId);
