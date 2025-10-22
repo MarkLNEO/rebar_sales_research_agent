@@ -52,7 +52,20 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Send immediate acknowledgment
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'status',
+            content: 'Starting research...'
+          })}\n\n`));
+
           console.log('[chat] Calling OpenAI Responses API...');
+          
+          // Send progress update
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'status',
+            content: 'Analyzing sources and gathering intelligence...'
+          })}\n\n`));
+
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
             instructions,
@@ -72,8 +85,17 @@ export async function POST(req: NextRequest) {
 
           let totalTokens = 0;
           const startTime = Date.now();
+          let firstTokenReceived = false;
 
           for await (const event of responseStream as any) {
+            // Send progress on first token
+            if (!firstTokenReceived && event.type === 'response.output_text.delta') {
+              firstTokenReceived = true;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'status',
+                content: 'Generating report...'
+              })}\n\n`));
+            }
             // Transform OpenAI Responses API events to frontend-compatible format
             if (event.type === 'response.output_text.delta' && event.delta) {
               // Frontend expects type: 'content' with content field
