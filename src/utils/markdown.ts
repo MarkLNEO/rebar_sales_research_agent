@@ -32,8 +32,29 @@ export function stripClarifierBlocks(raw: string): string {
   return text;
 }
 
-export function normalizeMarkdown(raw: string, opts?: { enforceResearchSections?: boolean }): string {
-  const enforce = opts?.enforceResearchSections !== false; // default true for research flows
+/**
+ * Normalize markdown output
+ * 
+ * @param raw - Raw markdown text
+ * @param opts - Options for normalization
+ * @param opts.enforceResearchSections - Add missing research sections (default: false)
+ * @param opts.autoBold - Auto-bold key terms like ICP fit (default: true)
+ * @param opts.normalizeHeadings - Normalize heading formats (default: true)
+ * @param opts.addSpacing - Add spacing between sections (default: true)
+ * 
+ * Made opt-in to reduce conflicts with streamdown and give more control
+ */
+export function normalizeMarkdown(raw: string, opts?: { 
+  enforceResearchSections?: boolean;
+  autoBold?: boolean;
+  normalizeHeadings?: boolean;
+  addSpacing?: boolean;
+}): string {
+  const enforce = opts?.enforceResearchSections ?? false; // Changed default to FALSE
+  const autoBold = opts?.autoBold ?? true;
+  const normalizeHeadings = opts?.normalizeHeadings ?? true;
+  const addSpacing = opts?.addSpacing ?? true;
+  
   let text = stripClarifierBlocks(raw || '');
 
   // Convert plain-text bullets (• or –) to markdown dashes when used as list items
@@ -219,37 +240,41 @@ export function normalizeMarkdown(raw: string, opts?: { enforceResearchSections?
     text = text.replace(pattern, to);
   }
 
-  // Add better spacing between sections
-  text = text.replace(/(##\s+[^\n]+\n)/g, '\n$1\n');
-  
-  // Auto-bold key terms that aren't already in headings
-  const keyTermPatterns = [
-    { pattern: /\b(ICP fit(?:\s+score)?:?\s+\d+%)/gi, bold: true },
-    { pattern: /\b(Recommendation:?\s+(?:Pursue|Pass|Monitor))/gi, bold: true },
-    { pattern: /\b(Priority:?\s+(?:High|Medium|Low|Critical))/gi, bold: true },
-    { pattern: /\b(Status:?\s+\w+)/gi, bold: true },
-    { pattern: /^(\s*ICP\s+Fit:)/gim, bold: true },
-    { pattern: /^(\s*Key\s+Takeaways?:)/gim, bold: true },
-    { pattern: /^(\s*Decision\s+Makers?:)/gim, bold: true },
-    { pattern: /^(\s*Buying\s+Signals?:)/gim, bold: true }
-  ];
-
-  // Only apply outside of headings and code blocks
-  const lines = text.split('\n');
-  let inCode = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^```/.test(line.trim())) {
-      inCode = !inCode;
-      continue;
-    }
-    if (inCode || /^#{1,6}\s/.test(line)) continue;
-    
-    for (const { pattern } of keyTermPatterns) {
-      lines[i] = lines[i].replace(pattern, '**$1**');
-    }
+  // Add better spacing between sections (opt-in)
+  if (addSpacing) {
+    text = text.replace(/(##\s+[^\n]+\n)/g, '\n$1\n');
   }
-  text = lines.join('\n');
+  
+  // Auto-bold key terms that aren't already in headings (opt-in)
+  if (autoBold) {
+    const keyTermPatterns = [
+      { pattern: /\b(ICP fit(?:\s+score)?:?\s+\d+%)/gi, bold: true },
+      { pattern: /\b(Recommendation:?\s+(?:Pursue|Pass|Monitor))/gi, bold: true },
+      { pattern: /\b(Priority:?\s+(?:High|Medium|Low|Critical))/gi, bold: true },
+      { pattern: /\b(Status:?\s+\w+)/gi, bold: true },
+      { pattern: /^(\s*ICP\s+Fit:)/gim, bold: true },
+      { pattern: /^(\s*Key\s+Takeaways?:)/gim, bold: true },
+      { pattern: /^(\s*Decision\s+Makers?:)/gim, bold: true },
+      { pattern: /^(\s*Buying\s+Signals?:)/gim, bold: true }
+    ];
+
+    // Only apply outside of headings and code blocks
+    const lines = text.split('\n');
+    let inCode = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^```/.test(line.trim())) {
+        inCode = !inCode;
+        continue;
+      }
+      if (inCode || /^#{1,6}\s/.test(line)) continue;
+      
+      for (const { pattern } of keyTermPatterns) {
+        lines[i] = lines[i].replace(pattern, '**$1**');
+      }
+    }
+    text = lines.join('\n');
+  }
 
   // Clean up excessive spacing
   text = text.replace(/\n{4,}/g, '\n\n\n');

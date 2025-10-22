@@ -1,3 +1,24 @@
+/**
+ * MAIN SYSTEM PROMPT BUILDER
+ * 
+ * ⚠️ THIS IS THE ONLY ACTIVE PROMPT BUILDER IN THE APPLICATION ⚠️
+ * 
+ * Do NOT look at src/services/agents/* - those are archived/unused legacy code.
+ * To modify system prompts, edit the buildSystemPrompt() function in this file only.
+ * 
+ * Architecture:
+ * - This file: Builds prompts inline with user context
+ * - src/services/agents/types.ts: Type definitions only
+ * - archive/agents/*: Old agent classes (not used, kept for reference)
+ * 
+ * The prompt is built dynamically from:
+ * 1. Base instructions (research behaviors, tool usage, output format)
+ * 2. Learned preferences (from user behavior tracking)
+ * 3. User profile context (ICP, company info, role)
+ * 4. Custom criteria and signals (user-defined data points)
+ * 5. Terminology preferences (user's exact words)
+ */
+
 import type { ResolvedPrefs } from '../../../shared/preferences';
 
 function buildLearnedPreferencesSection(prefs: ResolvedPrefs): string {

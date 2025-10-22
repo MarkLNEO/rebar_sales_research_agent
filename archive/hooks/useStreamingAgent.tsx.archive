@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { UserContext, ChatMessage } from '../services/agents/types';
-import { ResearchAgent, SettingsAgent, ProfilerAgent } from '../services/agents/ResearchAgent';
+// Note: Agent classes moved to archive - not used in streaming implementation
 
 export interface StreamingAgentOptions {
   agentType?: 'company_research' | 'settings_agent' | 'company_profiler';
