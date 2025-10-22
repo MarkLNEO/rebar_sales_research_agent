@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { useToast } from './ToastProvider';
 import { deriveIcpMeta } from '../utils/researchOutput';
+import { stripClarifierBlocks } from '../utils/markdown';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
@@ -93,9 +94,6 @@ const dropEmptySections = (markdown: string | null | undefined): string => {
 };
 
 function MarkdownContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
-  // Import stripClarifierBlocks at component level
-  const { stripClarifierBlocks } = require('../utils/markdown');
-  
   // Minimal processing: only strip LLM artifacts, let Streamdown handle markdown parsing
   const processedContent = useMemo(() => {
     if (isStreaming) {
