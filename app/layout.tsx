@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'RebarHQ - B2B Intelligence Platform',
   description: 'AI-powered company research and prospect intelligence for sales teams',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
