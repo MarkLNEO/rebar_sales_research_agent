@@ -34,7 +34,7 @@ export function PendingApproval() {
           </h1>
           
           <p className="text-gray-600 mb-6">
-            Thanks for signing up! Your account is currently awaiting approval from our team.
+            Thanks for signing up! Your account is pending approval. You&apos;ll receive an email once you&apos;re approved to use the platform.
           </p>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

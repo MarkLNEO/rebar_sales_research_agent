@@ -135,13 +135,13 @@ export function Login() {
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/signup" className="text-blue-600 font-medium hover:text-blue-700">
               Sign up
             </Link>
           </div>
         </div>
-        <p className="mt-6 text-center text-xs text-gray-500">© {new Date().getFullYear()} RebarHQ. All rights reserved.</p>
+        <p className="mt-6 text-center text-xs text-gray-500">{' 2023'} RebarHQ. All rights reserved.</p>
       </div>
     </div>
   );

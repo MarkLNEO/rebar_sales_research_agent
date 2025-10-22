@@ -1779,7 +1779,7 @@ Onboarding flow:
                             </li>
                           ))
                         ) : (
-                          <li className="text-sm text-emerald-700">No conversational preferences stored yet. The agent will add items as you correct or refine outputs.</li>
+                          <li className="text-sm text-emerald-700">This company hasn't been researched yet. Click "Run Research" to generate a comprehensive report.</li>
                         )}
                       </ul>
                     </div>

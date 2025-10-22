@@ -3760,9 +3760,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
             </div>
           )}
           {!resolvedLoading && (!resolvedPrefs || Object.keys(resolvedPrefs).length === 0) && (
-            <div className="mb-4 text-xs text-gray-500">
-              No saved preferences yet. I'll learn from your usage.
-            </div>
+            <div className="mb-4 text-xs text-gray-500">No saved preferences yet. I&apos;ll learn from your usage.</div>
           )}
           {aliasPrompts.length > 0 && (
             <div className="mb-4 space-y-3" role="region" aria-label="Alias confirmations">
