@@ -48,11 +48,11 @@ export class GPT5AgentFactory {
   private static validateContext(context: UserContext): UserContext {
     // Ensure all required fields exist
     const validated: UserContext = {
-      profile: context.profile || null,
+      profile: context.profile || undefined,
       customCriteria: context.customCriteria || [],
       signals: context.signals || [],
       disqualifiers: context.disqualifiers || [],
-      promptConfig: context.promptConfig || null,
+      promptConfig: context.promptConfig || undefined,
       reportPreferences: context.reportPreferences || [],
       agentType: context.agentType || 'company_research'
     };
