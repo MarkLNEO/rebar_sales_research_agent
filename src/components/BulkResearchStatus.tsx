@@ -78,7 +78,8 @@ export function BulkResearchStatus({ onJobComplete }: BulkResearchStatusProps) {
       if (hasActiveJobs) {
         if (!isPoll || pollModeRef.current !== 'fast') {
           stopPolling();
-          pollRef.current = setInterval(() => { void loadJobs(true); }, 5000);
+          // Increased from 5s to 10s to reduce server load
+          pollRef.current = setInterval(() => { void loadJobs(true); }, 10000);
           pollModeRef.current = 'fast';
         }
       } else if (!isPoll) {
@@ -117,17 +118,7 @@ export function BulkResearchStatus({ onJobComplete }: BulkResearchStatusProps) {
     }
   }, [addToast, onJobComplete, stopPolling]);
 
-  useEffect(() => {
-    void loadJobs();
-    const triggerReload = () => {
-      void loadJobs();
-    };
-    window.addEventListener('bulk-research:job-started', triggerReload);
-    return () => {
-      window.removeEventListener('bulk-research:job-started', triggerReload);
-      stopPolling();
-    };
-  }, [loadJobs, stopPolling]);
+  // Note: Initial setup useEffect is at the top (line 39-49), this duplicate was removed
 
   const downloadResults = (job: BulkResearchJob) => {
     if (!job.results) return;
