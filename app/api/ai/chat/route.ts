@@ -125,6 +125,23 @@ export async function POST(req: NextRequest) {
                 content: 'Generating report...'
               })}\n\n`));
             }
+            
+            // Stream reasoning/thinking process
+            if (event.type === 'response.reasoning.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning',
+                content: event.delta
+              })}\n\n`));
+            }
+            
+            // Stream planning/step progress
+            if (event.type === 'response.reasoning_progress' && event.content) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning_progress',
+                content: event.content
+              })}\n\n`));
+            }
+            
             // Transform OpenAI Responses API events to frontend-compatible format
             if (event.type === 'response.output_text.delta' && event.delta) {
               // Frontend expects type: 'content' with content field

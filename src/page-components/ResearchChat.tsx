@@ -2241,7 +2241,13 @@ useEffect(() => {
 
       let assistant = await streamAIResponse(text, chatId, { overrideDepth: runModeOverride });
       const usedDepth = (runModeOverride || preferredResearchType || 'deep') as 'deep'|'quick'|'specific';
-      assistant = normalizeMarkdown(assistant, { enforceResearchSections: usedDepth !== 'specific' });
+      // Light normalization only - don't enforce sections to avoid jarring reformatting
+      assistant = normalizeMarkdown(assistant, { 
+        enforceResearchSections: false,  // Don't auto-add "High Level" or other sections
+        normalizeHeadings: true,          // Keep heading consistency
+        autoBold: true,                   // Keep key term bolding
+        addSpacing: false                 // Don't add spacing (already streamed)
+      });
 
       // Persist any save_profile commands returned by the agent
       await processSaveCommands(assistant);

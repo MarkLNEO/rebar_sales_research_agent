@@ -193,12 +193,11 @@ export function normalizeMarkdown(raw: string, opts?: {
   }
 
   if (enforce) {
-    // Ensure High Level section exists; if missing, add placeholder after headline
-    if (!/^##\s+High Level/m.test(text) && !usesCustomTemplate) {
-      text = text.replace(/^#\s.+$/m, (match) => `${match}\n\n## High Level\n- No high-level summary provided yet.\n`);
-      if (!/^##\s+High Level/m.test(text)) {
-        text = `${text.trim()}\n\n## High Level\n- No high-level summary provided yet.\n`;
-      }
+    // Only add High Level section if there's explicit content for it
+    // Don't auto-add empty placeholders (prevents "High Level" appearing unnecessarily)
+    const hasHighLevelContent = /##\s+High Level\s*\n[\s\S]+?(?=\n##\s+|$)/m.test(text);
+    if (!hasHighLevelContent && !usesCustomTemplate) {
+      // Skip auto-adding High Level - let AI decide if it's needed
     }
   }
 
