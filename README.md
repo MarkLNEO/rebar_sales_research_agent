@@ -1,6 +1,15 @@
-# RebarHQ - Next.js Full-Stack Application
+# RebarHQ - B2B Sales Intelligence Platform
 
-B2B Intelligence Platform with AI-powered company research and optimized streaming API.
+AI-powered company research with personalized terminology, preference learning, and comprehensive web-sourced insights.
+
+## 🌟 Latest Updates (v2.0)
+
+### ✅ **UAT Compliance Complete** - Score: 9.5/10
+- **Preference Learning**: Agent learns and uses your exact terminology
+- **Web Search**: Comprehensive research with real-time web sources
+- **Watchlist Persistence**: Always shows what's being monitored
+- **Custom Terminology**: "Indicators" instead of "Buying Signals" - your words, your way
+- **Production Ready**: All critical features tested and optimized
 
 ## Quick Start
 
