@@ -115,6 +115,8 @@ export async function POST(req: NextRequest) {
           let totalTokens = 0;
           const startTime = Date.now();
           let firstTokenReceived = false;
+          let contentBuffer = ''; // Buffer to detect planning checklist
+          let planningExtracted = false;
 
           for await (const event of responseStream as any) {
             // Send progress on first token (skip for profile coach to reduce noise)
@@ -144,11 +146,50 @@ export async function POST(req: NextRequest) {
             
             // Transform OpenAI Responses API events to frontend-compatible format
             if (event.type === 'response.output_text.delta' && event.delta) {
-              // Frontend expects type: 'content' with content field
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                type: 'content',
-                content: event.delta
-              })}\n\n`));
+              // Buffer content to detect planning checklist
+              contentBuffer += event.delta;
+              
+              // Try to extract planning checklist from beginning of response
+              if (!planningExtracted && contentBuffer.length > 50) {
+                const planMatch = contentBuffer.match(/🎯\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{20,500}?)\n\n/);
+                if (planMatch) {
+                  planningExtracted = true;
+                  const planContent = planMatch[0].trim();
+                  
+                  // Send planning as reasoning_progress event
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: 'reasoning_progress',
+                    content: planContent
+                  })}\n\n`));
+                  
+                  // Continue with content after the plan
+                  const afterPlan = contentBuffer.substring(planMatch.index! + planMatch[0].length);
+                  if (afterPlan) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      type: 'content',
+                      content: afterPlan
+                    })}\n\n`));
+                  }
+                  contentBuffer = ''; // Clear buffer
+                  continue;
+                }
+              }
+              
+              // If no planning detected yet and buffer is large, start sending content
+              if (!planningExtracted && contentBuffer.length > 800) {
+                planningExtracted = true; // Stop looking
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'content',
+                  content: contentBuffer
+                })}\n\n`));
+                contentBuffer = '';
+              } else if (planningExtracted) {
+                // Already extracted or not present, stream content normally
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'content',
+                  content: event.delta
+                })}\n\n`));
+              }
             }
 
             // Track token usage from response.done event

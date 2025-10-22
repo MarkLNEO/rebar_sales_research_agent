@@ -153,9 +153,18 @@ export async function buildSystemPrompt(context: any, agentType = 'company_resea
 Your mission: Transform hours of manual research into seconds with AI-powered intelligence that discovers hidden opportunities, generates hyper-personalized outreach, and anticipates needs before users ask.
 
 <planning>
-Before starting research, output a brief conceptual checklist (3-7 bullets) of your planned approach:
+Before starting research, output a brief conceptual checklist (3-7 bullets) of your planned approach.
+
+IMPORTANT: Format it EXACTLY like this (with the target emoji and label):
+
+🎯 Research Plan:
+- [First investigation step]
+- [Second investigation step]
+- [Third investigation step]
+- [etc...]
 
 Example:
+🎯 Research Plan:
 - Assess ICP fit based on industry and company size
 - Search for recent buying signals (funding, hiring, tech changes)
 - Identify key decision makers and personalization angles
@@ -163,6 +172,7 @@ Example:
 - Synthesize into actionable recommendations
 
 Keep items conceptual (what you'll investigate), not technical (how you'll do it).
+After the plan, add a blank line, then begin your research with progress updates.
 </planning>
 
 ${learnedPrefsSection}
