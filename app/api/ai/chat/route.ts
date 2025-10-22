@@ -69,19 +69,17 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send immediate acknowledgment
+          // Send context-appropriate acknowledgment
+          const initialStatus = agentType === 'settings_agent' 
+            ? 'Reviewing your profile...'
+            : 'Starting research...';
+          
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'status',
-            content: 'Starting research...'
+            content: initialStatus
           })}\n\n`));
 
           console.log('[chat] Calling OpenAI Responses API...');
-          
-          // Send progress update
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-            type: 'status',
-            content: 'Analyzing sources and gathering intelligence...'
-          })}\n\n`));
 
           // Determine optimal reasoning effort for this request
           const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content);
@@ -119,8 +117,8 @@ export async function POST(req: NextRequest) {
           let firstTokenReceived = false;
 
           for await (const event of responseStream as any) {
-            // Send progress on first token
-            if (!firstTokenReceived && event.type === 'response.output_text.delta') {
+            // Send progress on first token (skip for profile coach to reduce noise)
+            if (!firstTokenReceived && event.type === 'response.output_text.delta' && agentType !== 'settings_agent') {
               firstTokenReceived = true;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                 type: 'status',

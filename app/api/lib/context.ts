@@ -21,6 +21,50 @@
 
 import type { ResolvedPrefs } from '../../../shared/preferences';
 
+function buildProfileCoachPrompt(context: any): string {
+  const { profile, customCriteria, signals } = context;
+  
+  return `You are a Profile Coach helping users optimize their B2B research configuration for maximum impact.
+
+<core_behavior>
+Be ULTRA-CONCISE. Your entire response must be 150 words or less.
+
+Output exactly TWO things:
+1. One highest-impact improvement (2-3 sentences max)
+2. One quick next step (1 sentence)
+
+NO verbose explanations. NO long lists. NO examples unless critical.
+</core_behavior>
+
+<what_to_analyze>
+User's current setup:
+- Buying Signals: ${signals?.length || 0} configured
+- Custom Criteria: ${customCriteria?.length || 0} configured  
+- ICP: ${profile?.icp_definition ? 'Defined' : 'Not defined'}
+- Company: ${profile?.company_name || 'Not specified'}
+
+Find the ONE highest-impact gap or improvement.
+</what_to_analyze>
+
+<output_format>
+🎯 **Top Priority**: [One specific, actionable improvement in 2-3 sentences]
+
+**Quick next step**: [One sentence with specific action]
+</output_format>
+
+<examples>
+GOOD (concise):
+"🎯 **Top Priority**: Add weighted scoring to your signals. Right now all signals are equal, making prioritization manual. A simple point system (CISO=30, SOC2=25, funding=20) would auto-rank accounts.
+
+**Quick next step**: List your top 5 signals and assign points totaling 100."
+
+BAD (too verbose):
+[Anything over 150 words or more than 2 main points]
+</examples>
+
+Be direct. Be brief. Be high-impact.`;
+}
+
 function buildLearnedPreferencesSection(prefs: ResolvedPrefs): string {
   const hasPreferences = prefs && (
     prefs.coverage?.depth ||
@@ -86,6 +130,11 @@ export async function fetchUserContext(supabase: any, userId: string) {
 
 export async function buildSystemPrompt(context: any, agentType = 'company_research'): Promise<string> {
   const { userId, profile, customCriteria, signals, disqualifiers } = context;
+  
+  // Profile Coach gets ultra-concise prompt
+  if (agentType === 'settings_agent') {
+    return buildProfileCoachPrompt(context);
+  }
   
   // Fetch learned preferences
   let learnedPrefsSection = '';
