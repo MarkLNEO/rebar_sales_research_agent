@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { Sidebar } from '../components/Sidebar';
 import { useToast } from '../components/ToastProvider';
 import { MessageBubble } from '../components/MessageBubble';
-import { normalizeMarkdown } from '../utils/markdown';
+import { stripClarifierBlocks } from '../utils/markdown';
 import { MessageInput } from '../components/MessageInput';
 import { ProfileCompleteness } from '../components/ProfileCompleteness';
 import { ThinkingIndicator } from '../components/ThinkingIndicator';
@@ -782,7 +782,8 @@ Onboarding flow:
 
     try {
       let fullResponse = await streamAIResponse(systemPrompt, chatId, true);
-      fullResponse = normalizeMarkdown(fullResponse, { enforceResearchSections: false });
+      // Only strip LLM artifacts, let Streamdown handle markdown parsing
+      fullResponse = stripClarifierBlocks(fullResponse);
       const saveConfirmation = await processSaveCommands(fullResponse);
       let displayResponse = (() => {
         const stripped = stripSaveProfileBlocks(fullResponse).trim();
@@ -887,7 +888,8 @@ Onboarding flow:
       }
 
       let fullResponse = await streamAIResponse(userMessage);
-      fullResponse = normalizeMarkdown(fullResponse, { enforceResearchSections: false });
+      // Only strip LLM artifacts, let Streamdown handle markdown parsing
+      fullResponse = stripClarifierBlocks(fullResponse);
 
       // Check if response contains profile save command
       const saveConfirmation = await processSaveCommands(fullResponse);

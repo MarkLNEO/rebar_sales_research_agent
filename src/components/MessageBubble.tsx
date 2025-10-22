@@ -93,6 +93,22 @@ const dropEmptySections = (markdown: string | null | undefined): string => {
 };
 
 function MarkdownContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  // Import stripClarifierBlocks at component level
+  const { stripClarifierBlocks } = require('../utils/markdown');
+  
+  // Minimal processing: only strip LLM artifacts, let Streamdown handle markdown parsing
+  const processedContent = useMemo(() => {
+    if (isStreaming) {
+      // During streaming: ONLY strip clarifier blocks (LLM-specific artifacts)
+      // Let Streamdown handle ALL markdown parsing
+      return stripClarifierBlocks(content);
+    }
+    
+    // After streaming completes: still minimal processing
+    // Streamdown handles markdown, we only clean up LLM artifacts
+    return stripClarifierBlocks(content);
+  }, [content, isStreaming]);
+
   return (
     <div className="streamdown-wrapper text-gray-900 select-text">
       <Streamdown
@@ -112,7 +128,7 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
           hr: () => <hr className="my-6 border-gray-200" />,
         }}
       >
-        {content}
+        {processedContent}
       </Streamdown>
     </div>
   );

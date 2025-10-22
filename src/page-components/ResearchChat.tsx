@@ -2241,13 +2241,9 @@ useEffect(() => {
 
       let assistant = await streamAIResponse(text, chatId, { overrideDepth: runModeOverride });
       const usedDepth = (runModeOverride || preferredResearchType || 'deep') as 'deep'|'quick'|'specific';
-      // Light normalization only - don't enforce sections to avoid jarring reformatting
-      assistant = normalizeMarkdown(assistant, { 
-        enforceResearchSections: false,  // Don't auto-add "High Level" or other sections
-        normalizeHeadings: true,          // Keep heading consistency
-        autoBold: true,                   // Keep key term bolding
-        addSpacing: false                 // Don't add spacing (already streamed)
-      });
+      // Minimal processing - only strip LLM artifacts, let Streamdown handle markdown
+      // NO normalizeMarkdown - it conflicts with Streamdown's parser
+      assistant = stripClarifierBlocks(assistant);
 
       // Persist any save_profile commands returned by the agent
       await processSaveCommands(assistant);
