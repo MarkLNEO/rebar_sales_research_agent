@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
             // Dynamic reasoning effort (saves tokens on simple tasks)
             reasoning: { 
               effort: reasoningEffort,
-              summary: 'detailed' as any // Request detailed reasoning summaries for transparency
+              summary: 'high' as any // Request high-detail reasoning summaries (API accepts: low, medium, high)
             },
             
             store: true,
