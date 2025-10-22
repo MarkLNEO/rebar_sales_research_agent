@@ -8,21 +8,15 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 // Helper: Determine reasoning effort dynamically based on task type
-function getReasoningEffort(agentType: string, userMessage: string): 'low' | 'medium' | 'high' {
-  // Quick brief: low (speed over depth)
-  if (agentType === 'quick') {
-    return 'low';
+function getReasoningEffort(agentType: string, userMessage: string): 'medium' | 'high' {
+  // NEVER use 'low' - minimum is 'medium' for reasoning visibility
+  
+  // Complex research or very long queries: high
+  if (userMessage.length > 200 || agentType === 'company_research') {
+    return 'high';
   }
   
-  // Very short follow-ups (< 30 chars): low
-  // Raised threshold from 50 to 30 to keep more queries at medium
-  if (userMessage.length < 30) {
-    return 'low';
-  }
-  
-  // Deep research and most queries: medium (DEFAULT - enables reasoning visibility)
-  // Medium effort shows internal reasoning which we want for transparency
-  // Complex multi-step tasks: high (rare, only when explicitly needed)
+  // Default: medium (enables reasoning visibility while saving tokens)
   return 'medium';
 }
 
@@ -95,7 +89,7 @@ export async function POST(req: NextRequest) {
             // Text formatting with verbosity control
             text: { 
               format: { type: 'text' },
-              verbosity: 'high' as any // Use 'high' for richer output (API accepts: low, medium, high)
+              verbosity: 'medium' as any // Use medium for balanced output (low/medium based on context)
             },
             
             max_output_tokens: 16000,
