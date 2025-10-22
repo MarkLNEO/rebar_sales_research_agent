@@ -360,7 +360,7 @@ interface Chat {
 
 interface ThinkingEvent {
   id: string;
-  type: 'reasoning' | 'web_search' | 'reasoning_progress' | 'acknowledgment' | 'content_extraction' | 'accounts_added' | 'context_preview';
+  type: 'reasoning' | 'web_search' | 'reasoning_progress' | 'acknowledgment' | 'content_extraction' | 'accounts_added' | 'context_preview' | 'status';
   content?: string;
   query?: string;
   sources?: string[];
@@ -2860,14 +2860,34 @@ useEffect(() => {
                     invalidateUserProfileCache(user?.id);
                   }
                 }
+                // Handle status messages (progress indicators)
+                else if (parsed.type === 'status') {
+                  if (parsed.content) {
+                    setThinkingEvents(prev => {
+                      // Replace the last status message or add new one
+                      const filtered = prev.filter(e => e.type !== 'status');
+                      return [...filtered, {
+                        id: `status-${Date.now()}`,
+                        type: 'status',
+                        content: parsed.content
+                      }];
+                    });
+                  }
+                }
                 // Handle output text deltas (supports both Edge Function and Vercel API formats)
                 else if (parsed.type === 'response.output_text.delta' || parsed.type === 'content') {
                   // Edge Function uses parsed.delta, Vercel API uses parsed.content
                   const delta = parsed.delta || parsed.content;
                   if (delta) {
-                    markFirstDelta();
-                    mainContent += delta;
-                    updateStreaming();
+                    // Filter out thinking blocks from response
+                    const filteredDelta = delta.replace(/<thinking>.*?<\/thinking>/gs, '');
+                    if (filteredDelta) {
+                      markFirstDelta();
+                      // Clear status messages once content starts
+                      setThinkingEvents(prev => prev.filter(e => e.type !== 'status'));
+                      mainContent += filteredDelta;
+                      updateStreaming();
+                    }
                   }
                 } else if (parsed.type === 'tldr') {
                   if (typeof parsed.content === 'string') {

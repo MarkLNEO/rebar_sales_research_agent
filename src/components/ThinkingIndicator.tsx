@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Streamdown } from 'streamdown';
 
 interface ThinkingIndicatorProps {
-  type: 'reasoning' | 'web_search' | 'reasoning_progress' | 'acknowledgment' | 'content_extraction' | 'accounts_added' | 'context_preview';
+  type: 'reasoning' | 'web_search' | 'reasoning_progress' | 'acknowledgment' | 'content_extraction' | 'accounts_added' | 'context_preview' | 'status';
   content?: string;
   query?: string;
   sources?: string[];
@@ -80,6 +80,18 @@ function PlanningIndicator({ content }: { content?: string }) {
 export function ThinkingIndicator({ type, content, query, sources, url, count, companies, company: previewCompany, icp, critical, important }: ThinkingIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const toggle = () => { setIsExpanded(v => !v); };
+
+  // Handle status messages (progress indicators)
+  if (type === 'status') {
+    return (
+      <div className="flex gap-3 items-start mb-3 animate-fadeIn">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+          <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+          <span className="text-blue-900 font-medium">{content || 'Processing...'}</span>
+        </div>
+      </div>
+    );
+  }
 
   if (type === 'context_preview') {
     return (
