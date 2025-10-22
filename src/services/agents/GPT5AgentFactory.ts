@@ -150,7 +150,7 @@ export class GPT5AgentFactory {
       customCriteria: customCriteria || [],
       signals: signals || [],
       disqualifiers: disqualifiers || [],
-      promptConfig: null,
+      promptConfig: undefined,
       reportPreferences: [],
       agentType
     };
