@@ -1095,7 +1095,7 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
 
               <button
                 type="button"
-                onClick={handleFinalizeSetup}
+                onClick={() => finishOnboarding(selectedFocus)}
                 disabled={selectedFocus.length === 0 || isTyping}
                 className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               >

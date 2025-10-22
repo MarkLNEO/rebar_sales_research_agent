@@ -287,7 +287,7 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
             </div>
             <h4 className="text-sm font-semibold text-gray-900 mb-1">Start Tracking Accounts</h4>
             <p className="text-xs text-gray-600 mb-3 px-2 leading-relaxed">
-              Get daily intelligence on key accounts. We'll monitor for buying signals,
+              Get daily intelligence on key accounts. We&apos;ll monitor for buying signals,
               leadership changes, and strategic initiatives automatically.
             </p>
             <button
