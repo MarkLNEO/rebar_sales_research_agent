@@ -187,10 +187,8 @@ export function BulkAccountUpload({ onClose, onSuccess }: BulkAccountUploadProps
                     setCsvText(e.target.value);
                     if (e.target.value) parseCSV(e.target.value);
                   }}
-                  placeholder="Company Name, URL (optional), Priority (optional), Notes (optional)
-Boeing, boeing.com, hot, Defense contractor
-Lockheed Martin, lockheedmartin.com, warm
-Raytheon Technologies"
+                  placeholder="Company Name, Domain
+Stripe, stripe.com"
                   className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
                 />
 
