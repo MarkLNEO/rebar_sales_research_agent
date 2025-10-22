@@ -60,7 +60,7 @@ async function loginUser(page: Page, email: string, password: string) {
 
   // Fill login form
   await page.getByPlaceholder('you@company.com').fill(email);
-  await page.getByPlaceholder('••••••••').fill(password);  // Password field uses bullet placeholder
+  await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
 
   // Wait for successful login
