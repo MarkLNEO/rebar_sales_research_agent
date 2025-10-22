@@ -87,9 +87,9 @@ export async function GET(req: NextRequest) {
       suggestions.push(`Research ${first.company_name} and summarise what's changed`);
       suggestions.push('Which of my accounts had changes this week?');
     } else if (accountStats.hot > 0) {
-      openingLine = `${accountStats.hot} of your tracked accounts are hot right now. Want a quick briefing?`;
+      openingLine = `${accountStats.hot} of your tracked ${accountStats.hot === 1 ? 'account is' : 'accounts are'} hot right now. Want a quick briefing?`;
     } else if (accountStats.total > 0) {
-      openingLine = `You're tracking ${accountStats.total} accounts. Want me to highlight the most active ones?`;
+      openingLine = `You're tracking ${accountStats.total} ${accountStats.total === 1 ? 'account' : 'accounts'}. Want me to highlight the most active ones?`;
     } else {
       openingLine = 'Ready when you are - just name a company and I\'ll prep the intel.';
     }

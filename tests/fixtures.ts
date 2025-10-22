@@ -63,8 +63,26 @@ async function loginUser(page: Page, email: string, password: string) {
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
 
-  // Wait for successful login
-  await expect(page.locator('button:has-text("Sign out")')).toBeVisible({ timeout: 10000 });
+  // Wait for page to load after login
+  await page.waitForTimeout(2000);
+
+  // Handle Welcome Agent modal if it appears (for new users)
+  const welcomeAgentVisible = await page.getByText(/Welcome Agent|Hey! I'm your Welcome Agent/i).isVisible().catch(() => false);
+  if (welcomeAgentVisible) {
+    console.log('Dismissing Welcome Agent...');
+
+    // Type "skip" in the input and press Enter to bypass the welcome flow
+    const inputField = page.getByPlaceholder(/Research.*or.*Help me set up/i);
+    if (await inputField.isVisible().catch(() => false)) {
+      await inputField.fill('skip');
+      await inputField.press('Enter');
+      await page.waitForTimeout(2000);
+    }
+  }
+
+  // Wait for main app to be visible (New Chat button indicates we're in)
+  await expect(page.getByRole('button', { name: /new chat/i })).toBeVisible({ timeout: 10000 });
+
   console.log(`Logged in as ${email}`);
 }
 

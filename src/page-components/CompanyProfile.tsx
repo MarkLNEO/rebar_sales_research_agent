@@ -1054,13 +1054,24 @@ Onboarding flow:
                     return [...others, { id: 'ack-live', type: 'acknowledgment' as any, content: parsed.content }];
                   });
                 }
-                // Handle reasoning events
+                // Handle reasoning events - accumulate deltas into a single event
                 if (parsed.type === 'reasoning') {
-                  setThinkingEvents(prev => [...prev, {
-                    id: `reasoning-${Date.now()}`,
-                    type: 'reasoning',
-                    content: parsed.content
-                  }]);
+                  setThinkingEvents(prev => {
+                    const existing = prev.find(e => e.type === 'reasoning');
+                    if (existing) {
+                      // Append new content to existing reasoning
+                      return prev.map(e => e.type === 'reasoning'
+                        ? { ...e, content: (e.content || '') + (parsed.content || '') }
+                        : e
+                      );
+                    }
+                    // Create new reasoning event
+                    return [...prev, {
+                      id: 'reasoning-main',
+                      type: 'reasoning',
+                      content: parsed.content || ''
+                    }];
+                  });
                 }
                 // Handle web search events
                 else if (parsed.type === 'web_search') {
@@ -1830,19 +1841,30 @@ Onboarding flow:
                   />
                 )}
 
-                {thinkingEvents.length > 0 && (
-                  <div className="space-y-2">
-                    {thinkingEvents.map((event) => (
-                      <ThinkingIndicator
-                        key={event.id}
-                        type={event.type}
-                        content={event.content}
-                        query={event.query}
-                        sources={event.sources}
-                      />
-                    ))}
-                  </div>
-                )}
+                {thinkingEvents.length > 0 && (() => {
+                  const latestReasoning = [...thinkingEvents].reverse().find(e => e.type === 'reasoning');
+                  const latestWebSearch = [...thinkingEvents].reverse().find(e => e.type === 'web_search');
+
+                  return (
+                    <div className="space-y-2">
+                      {latestReasoning && (
+                        <ThinkingIndicator
+                          key={latestReasoning.id}
+                          type={latestReasoning.type}
+                          content={latestReasoning.content}
+                        />
+                      )}
+                      {latestWebSearch && (
+                        <ThinkingIndicator
+                          key={latestWebSearch.id}
+                          type={latestWebSearch.type}
+                          query={latestWebSearch.query}
+                          sources={latestWebSearch.sources}
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {loading && !streamingMessage && thinkingEvents.length === 0 && messages.length === 0 && (
                   <ThinkingIndicator type={"reasoning_progress" as any} content="Preparing suggestions..." />

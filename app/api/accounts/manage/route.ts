@@ -59,9 +59,26 @@ export async function POST(req: NextRequest) {
 
       if (error) throw error;
 
+      const accounts = data || [];
+
+      // Calculate stats (same logic as dashboard/greeting for consistency)
+      const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+      const stats = {
+        total: accounts.length,
+        hot: accounts.filter((a: any) => a.priority === 'hot').length,
+        warm: accounts.filter((a: any) => a.priority === 'warm').length,
+        standard: accounts.filter((a: any) => a.priority === 'standard').length,
+        stale: accounts.filter((a: any) => {
+          const lastResearched = a.last_researched_at ? new Date(a.last_researched_at).getTime() : 0;
+          return !lastResearched || (Date.now() - lastResearched) > FOURTEEN_DAYS_MS;
+        }).length,
+        with_signals: 0 // TODO: Calculate from signals when needed
+      };
+
       return Response.json({
         success: true,
-        accounts: data || []
+        accounts,
+        stats
       });
     }
 

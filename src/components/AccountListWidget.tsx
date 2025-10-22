@@ -114,8 +114,8 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
   }, [accounts, addToast, onAccountClick]);
 
   const priorityLabel: Record<string, string> = {
-    hot: 'Hot',
-    warm: 'Warm',
+    hot: 'High priority',
+    warm: 'Medium priority',
     standard: 'Standard',
   };
 
@@ -311,12 +311,20 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
               const hasUnviewedSignals = (account.unviewed_signal_count || 0) > 0;
 
               return (
-                <button
+                <div
                   key={account.id}
                   onClick={() => onAccountClick(account)}
-                  className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-colors"
+                  className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-colors cursor-pointer"
                   data-testid="account-list-item"
                   data-priority={account.priority}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onAccountClick(account);
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -330,7 +338,7 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
                         }`}
                         >
                           {getPriorityIcon(account.priority)}
-                          <span className="uppercase tracking-wide">{priorityLabel[account.priority] ?? account.priority}</span>
+                          <span className="capitalize">{priorityLabel[account.priority] ?? account.priority}</span>
                         </span>
                         {hasUnviewedSignals && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full animate-pulse">
@@ -425,7 +433,7 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

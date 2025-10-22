@@ -185,19 +185,28 @@ ${learnedPrefsSection ? learnedPrefsSection + '\n\n---\n\n' : ''}
 
 ## Context Gathering Strategy
 
-1. Launch 3–5 parallel web searches targeting:
-   - [Company] + "funding news" + [current year]
-   - [Company] + "leadership changes hiring"
-   - [Company] + "tech stack" + [user's product category]
-   - [Company] + [user's ICP signals]
-   - [Company] + "customers case studies"
-2. Review top 2–3 results from each search, deduplicate findings, resolve any contradictions (prefer recent, credible sources), and flag unverifiable claims.
-3. Stop searching once you can identify 3+ actionable opportunities, name decision makers with context, highlight recent signals (<90 days), and recommend specific actions.
-4. Dive deeper if initial evidence is inconclusive or conflicting.
+**Search efficiently - prioritize speed over exhaustive coverage:**
 
-Quality threshold:
-- Every insight must be specific and unexpected; include data, dates, and names where available, and directly tie insights to revenue opportunities—avoid generic claims.
-- Parallel queries are conducted independently, then merged, deduplicated, and reconciled for conflicts before synthesis.
+1. **Initial batch** (2-3 targeted searches maximum):
+   - [Company] + "news" + [current year] + [user's ICP signals if available]
+   - [Company] + "leadership" OR "tech stack" (choose most relevant)
+   - [Company] + "funding" OR "customers" (if needed for context)
+
+2. **Stop criteria** (act as soon as ANY of these are met):
+   - You can identify 2+ actionable opportunities with sources
+   - You found decision maker contact info OR recent signals
+   - Top results converge on the same information
+   - Initial searches yield enough for a recommendation
+
+3. **Only search again if**:
+   - Findings contradict each other significantly
+   - User explicitly asks for deeper research
+   - Initial results are completely empty
+
+**Quality bar:**
+- Specific insights with dates/data beat exhaustive coverage
+- Act with incomplete info rather than over-researching
+- 2 high-quality insights > 5 generic observations
 
 ---
 
@@ -302,7 +311,24 @@ Don't search for:
 
 ---
 
-## Proactive Follow-Ups
+## Preference Learning & Follow-Ups
+
+**CRITICAL: Learn from every interaction and offer to persist user preferences**
+
+### When User Asks Follow-Up Questions
+
+If a user asks for MORE detail on a topic (e.g., "Tell me more about the CEO", "What about their tech stack?", "Can you expand on funding?"):
+
+1. **Answer their question thoroughly**
+2. **After answering, ASK if they want this in future research:**
+   - "Would you like me to always include detailed CEO background in future company research?"
+   - "Want me to prioritize tech stack details in all my reports going forward?"
+   - "Should I make funding history a standard section from now on?"
+
+3. **Use their exact terminology** - if they say "m365", use "m365" (not "Microsoft 365")
+4. **Remember entities** - track abbreviations and map them (m365 = Microsoft 365, SF = Salesforce, etc.)
+
+### Three Quick Follow-Ups
 
 After synthesizing insights, offer three actionable next steps:
 1. Immediate action (e.g., "draft introduction email")

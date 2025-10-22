@@ -7,28 +7,21 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 // Helper: Determine reasoning effort dynamically based on task type and research mode
+// Per OpenAI GPT-5 best practices: "Many workflows can be accomplished with consistent
+// results at medium or even low reasoning_effort" - prioritize latency over exhaustive reasoning
 function getReasoningEffort(
   agentType: string,
   userMessage: string,
   researchType?: 'quick' | 'deep' | 'specific'
-): 'medium' | 'high' {
-  // Quick mode: use medium reasoning for speed
-  if (researchType === 'quick') {
+): 'low' | 'medium' | 'high' {
+  // Deep mode with very complex queries: use medium reasoning (not high - too slow)
+  if (researchType === 'deep' && userMessage.length > 500) {
     return 'medium';
   }
 
-  // Specific mode (follow-ups): use medium reasoning
-  if (researchType === 'specific') {
-    return 'medium';
-  }
-
-  // Deep mode: use high reasoning for complex queries
-  if (researchType === 'deep') {
-    return userMessage.length > 300 ? 'high' : 'medium';
-  }
-
-  // Default: medium (enables reasoning visibility while saving tokens)
-  return 'medium';
+  // Default: LOW reasoning for fast TTFB and good results
+  // This significantly reduces planning overhead while maintaining quality
+  return 'low';
 }
 
 // Helper: Add mode-specific instructions to prompt
@@ -197,10 +190,9 @@ export async function POST(req: NextRequest) {
             
             max_output_tokens: 12000, // Reduced from 16000 to prevent excessive token usage
             tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
-            
-            // Enable reasoning summaries (not raw reasoning)
-            // gpt-5-mini supports 'detailed' summary which streams reasoning_summary_text.delta events
-            reasoning: { 
+
+            // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
+            reasoning: {
               effort: reasoningEffort,
               summary: 'detailed' as any // Required to enable reasoning summary streaming
             },
