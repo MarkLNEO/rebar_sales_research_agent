@@ -3246,7 +3246,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
         await handleContinueCompany();
         return;
       case 'follow_up': {
-        addToast({ type: 'info', title: 'Ask a follow-up', description: 'Type your question and I’ll keep context from this report.' });
+        addToast({ type: 'info', title: 'Ask a follow-up', description: 'Using quick research mode for focused answers.' });
         setInputValue(currentActionCompany ? `What follow-up questions should I ask ${currentActionCompany}? ` : 'What follow-up question should I ask? ');
         setFocusComposerTick(t => t + 1);
         return;
