@@ -102,7 +102,10 @@ export async function POST(req: NextRequest) {
             tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
             
             // Dynamic reasoning effort (saves tokens on simple tasks)
-            reasoning: { effort: reasoningEffort },
+            reasoning: { 
+              effort: reasoningEffort,
+              summary: 'detailed' as any // Request detailed reasoning summaries for transparency
+            },
             
             store: true,
             metadata: {
