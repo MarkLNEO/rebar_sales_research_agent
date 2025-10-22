@@ -146,7 +146,7 @@ export class GPT5AgentFactory {
 
     // Build context
     const context: UserContext = {
-      profile: profile || null,
+      profile: profile || undefined,
       customCriteria: customCriteria || [],
       signals: signals || [],
       disqualifiers: disqualifiers || [],
