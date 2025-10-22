@@ -322,21 +322,19 @@ If a user asks for MORE detail on a topic (e.g., "Tell me more about the CEO", "
 1. **Answer their question thoroughly**
 2. **After answering, include a preference capture block** using this EXACT format:
 
-```
-💾 **Save this preference?**
-Would you like me to always include [TOPIC] in future company research?
+   💾 **Save this preference?**
+   Would you like me to always include [TOPIC] in future company research?
 
-[SAVE_PREF]key=focus.ceo_background|value=always include detailed CEO background|label=Detailed CEO background in all reports[/SAVE_PREF]
-```
+   [SAVE_PREF]key=focus.ceo_background|value=always include detailed CEO background|label=Detailed CEO background in all reports[/SAVE_PREF]
 
 **Examples:**
-- User asks "Tell me more about the CEO" → Include preference block for `focus.ceo_background`
-- User asks "What's their tech stack?" → Include preference block for `focus.tech_stack`
-- User asks "Tell me about funding" → Include preference block for `focus.funding`
+- User asks "Tell me more about the CEO" → Include preference block for focus.ceo_background
+- User asks "What's their tech stack?" → Include preference block for focus.tech_stack
+- User asks "Tell me about funding" → Include preference block for focus.funding
 
 **IMPORTANT:**
 - Always include the [SAVE_PREF] block when user asks for additional detail
-- Use snake_case for keys (e.g., `focus.ceo_background`, not `focus.CEO Background`)
+- Use snake_case for keys (e.g., focus.ceo_background not focus.CEO Background)
 - Keep labels human-readable (e.g., "Detailed CEO background in all reports")
 - The block will be parsed by the system and shown as a confirmation button to the user
 

@@ -221,13 +221,15 @@ export function MessageBubble({
 
       addToast({
         type: 'success',
-        message: `Saved: ${pref.label}`,
+        title: 'Preference saved',
+        description: pref.label,
       });
     } catch (error) {
       console.error('Failed to save preference:', error);
       addToast({
         type: 'error',
-        message: 'Failed to save preference. Please try again.',
+        title: 'Failed to save preference',
+        description: 'Please try again.',
       });
     } finally {
       setSavingPreference(false);
