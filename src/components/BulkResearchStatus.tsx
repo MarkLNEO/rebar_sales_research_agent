@@ -76,13 +76,15 @@ export function BulkResearchStatus({ onJobComplete }: BulkResearchStatusProps) {
       const nextJobs = data || [];
       const hasActiveJobs = nextJobs.some(job => job.status === 'pending' || job.status === 'running');
       if (hasActiveJobs) {
+        // Start polling if not already polling
         if (!isPoll || pollModeRef.current !== 'fast') {
           stopPolling();
-          // Increased from 5s to 10s to reduce server load
+          // Poll every 10 seconds while jobs are active
           pollRef.current = setInterval(() => { void loadJobs(true); }, 10000);
           pollModeRef.current = 'fast';
         }
-      } else if (!isPoll) {
+      } else {
+        // CRITICAL FIX: Stop polling when no active jobs (regardless of isPoll)
         stopPolling();
       }
 
