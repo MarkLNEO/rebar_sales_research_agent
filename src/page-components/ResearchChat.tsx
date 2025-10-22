@@ -775,6 +775,15 @@ export function ResearchChat() {
   }, [userProfile, customCriteria, signalPreferences]);
   const refreshResolvedPreferences = useCallback(async () => {
     setResolvedLoading(true);
+    
+    // Fallback timeout to ensure loading state clears
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current) {
+        console.warn('Preferences loading timeout - clearing loading state');
+        setResolvedLoading(false);
+      }
+    }, 5000); // 5 second timeout
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -798,6 +807,7 @@ export function ResearchChat() {
         setResolvedPrefs(null);
       }
     } finally {
+      clearTimeout(timeoutId);
       if (isMountedRef.current) setResolvedLoading(false);
     }
   }, [supabase]);
@@ -1423,9 +1433,13 @@ useEffect(() => {
         if (fallbackError) throw fallbackError;
         return true;
       }
+      // Not an error - company just isn't tracked yet
       return false;
     } catch (err) {
-      console.warn('syncTrackedAccountResearch failed', err);
+      // Only log actual errors, not "not found" cases
+      if (err && typeof err === 'object' && 'code' in err && err.code !== 'PGRST204') {
+        console.warn('syncTrackedAccountResearch failed', err);
+      }
       return false;
     }
   }, [supabase, user?.id]);
