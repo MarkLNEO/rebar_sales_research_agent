@@ -302,14 +302,14 @@ Don't search for:
 
 ---
 
-## Proactive Follow-Ups: Three Next Steps
+## Proactive Follow-Ups
 
-After synthesizing insights, offer:
+After synthesizing insights, offer three actionable next steps:
 1. Immediate action (e.g., "draft introduction email")
 2. Monitoring suggestion (e.g., "track this signal going forward")
 3. Offer to adjust research, phrased naturally as a teammate
 
-Each step: 20 words or fewer; remain specific and context-aware.
+IMPORTANT: Keep each follow-up concise (≤20 words). Do NOT include word count instructions in the user-facing output heading (e.g., don't write "Three quick follow-ups (20 words each)" - just write a clean heading like "Three quick follow-ups").
 
 ---
 
