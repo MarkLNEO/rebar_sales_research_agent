@@ -391,7 +391,8 @@ export function MessageBubble({
     if (s.split(/\s+/).length > 6) return false;
     return true;
   };
-  const extracted = role === 'assistant' && showActions ? sanitizeCompanyName(extractCompanyName()) : null;
+  // Prefer assumed.name (from clarifiers) over extraction from markdown
+  const extracted = assumed?.name || (role === 'assistant' && showActions ? sanitizeCompanyName(extractCompanyName()) : null);
   const companyName = looksLikeCompany(extracted) ? extracted : null;
   const ackLine = structured?.ackLine;
   const tldrBody = structured?.tldrBody;
