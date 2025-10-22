@@ -774,22 +774,23 @@ export function ResearchChat() {
     };
   }, [userProfile, customCriteria, signalPreferences]);
   const refreshResolvedPreferences = useCallback(async () => {
+    console.log('[Preferences] Starting load, setting loading=true');
     setResolvedLoading(true);
     
     // Fallback timeout to ensure loading state clears
     const timeoutId = setTimeout(() => {
-      if (isMountedRef.current) {
-        console.warn('Preferences loading timeout - clearing loading state');
-        setResolvedLoading(false);
-      }
+      console.warn('[Preferences] Timeout fired - forcing loading=false');
+      setResolvedLoading(false);
     }, 5000); // 5 second timeout
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        if (isMountedRef.current) setResolvedPrefs(null);
+        console.log('[Preferences] No session, clearing');
+        setResolvedPrefs(null);
         return;
       }
+      console.log('[Preferences] Fetching from API...');
       const response = await fetch('/api/preferences', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -798,17 +799,15 @@ export function ResearchChat() {
       });
       if (!response.ok) throw new Error(`Failed to load preferences (${response.status})`);
       const payload = await response.json();
-      if (isMountedRef.current) {
-        setResolvedPrefs(payload?.resolved ?? null);
-      }
+      console.log('[Preferences] API success, setting prefs:', payload?.resolved ? 'has data' : 'empty');
+      setResolvedPrefs(payload?.resolved ?? null);
     } catch (error) {
-      if (isMountedRef.current) {
-        console.error('Failed to load resolved preferences', error);
-        setResolvedPrefs(null);
-      }
+      console.error('[Preferences] Error loading:', error);
+      setResolvedPrefs(null);
     } finally {
       clearTimeout(timeoutId);
-      if (isMountedRef.current) setResolvedLoading(false);
+      console.log('[Preferences] Finally block - setting loading=false, mounted=', isMountedRef.current);
+      setResolvedLoading(false);
     }
   }, [supabase]);
 
