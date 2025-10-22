@@ -9,17 +9,19 @@ export const maxDuration = 300;
 
 // Helper: Determine reasoning effort dynamically based on task type
 function getReasoningEffort(agentType: string, userMessage: string): 'low' | 'medium' | 'high' {
-  // Quick brief or short follow-ups: low
+  // Quick brief: low (speed over depth)
   if (agentType === 'quick') {
     return 'low';
   }
   
-  // Very short questions (< 50 chars) likely follow-ups: low
-  if (userMessage.length < 50) {
+  // Very short follow-ups (< 30 chars): low
+  // Raised threshold from 50 to 30 to keep more queries at medium
+  if (userMessage.length < 30) {
     return 'low';
   }
   
-  // Deep research: medium (default, balances quality and speed)
+  // Deep research and most queries: medium (DEFAULT - enables reasoning visibility)
+  // Medium effort shows internal reasoning which we want for transparency
   // Complex multi-step tasks: high (rare, only when explicitly needed)
   return 'medium';
 }
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
             // Text formatting with verbosity control
             text: { 
               format: { type: 'text' },
-              verbosity: 'medium' as any // Nested under text per API docs
+              verbosity: 'detailed' as any // Raised from 'medium' to 'detailed' for richer reasoning output
             },
             
             max_output_tokens: 16000,
@@ -150,8 +152,9 @@ export async function POST(req: NextRequest) {
               contentBuffer += event.delta;
               
               // Try to extract planning checklist from beginning of response
+              // Updated to match 🏯 emoji (castle) per OpenAI optimization
               if (!planningExtracted && contentBuffer.length > 50) {
-                const planMatch = contentBuffer.match(/🎯\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{20,500}?)\n\n/);
+                const planMatch = contentBuffer.match(/[🎯🏯]\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{20,500}?)\n\n/);
                 if (planMatch) {
                   planningExtracted = true;
                   const planContent = planMatch[0].trim();
