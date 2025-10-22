@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
             // Text formatting with verbosity control
             text: { 
               format: { type: 'text' },
-              verbosity: 'detailed' as any // Raised from 'medium' to 'detailed' for richer reasoning output
+              verbosity: 'high' as any // Use 'high' for richer output (API accepts: low, medium, high)
             },
             
             max_output_tokens: 16000,
