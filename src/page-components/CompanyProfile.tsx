@@ -217,6 +217,9 @@ export function CompanyProfile() {
     const normalizeLabel = (value: string) =>
       value.replace(/^focus\./, '').replace(/[_\.]/g, ' ').trim();
 
+    // Safety check: ensure savedPreferences is actually an array
+    if (!Array.isArray(savedPreferences)) return chips;
+
     for (const pref of savedPreferences) {
       const key = pref.key || '';
       if (!key) continue;
@@ -340,6 +343,9 @@ export function CompanyProfile() {
   }, [signalPreferenceItems, formatLabel]);
 
   const conversationalPreferenceSummaries = useMemo(() => {
+    // Safety check: ensure savedPreferences is actually an array
+    if (!Array.isArray(savedPreferences)) return [];
+
     const savedSummaries = savedPreferences
       .map(pref => {
         const key = (pref.key || '').replace(/^focus\./, '').replace(/[_\.]/g, ' ').trim();
@@ -584,7 +590,10 @@ export function CompanyProfile() {
       if (!response.ok) throw new Error(`Failed to fetch preferences (${response.status})`);
       const payload = await response.json();
       if (isMountedRef.current) {
-        setSavedPreferences(payload?.preferences || []);
+        // Handle both array format (new API) and object format (old API during deployment)
+        const prefs = payload?.preferences;
+        const prefsArray = Array.isArray(prefs) ? prefs : [];
+        setSavedPreferences(prefsArray);
       }
     } catch (error) {
       if (isMountedRef.current) {
