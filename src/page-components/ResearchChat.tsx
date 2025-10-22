@@ -4104,6 +4104,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
 
               {thinkingEvents.length > 0 && (() => {
                 const latestPlan = [...thinkingEvents].reverse().find(ev => ev.type === 'reasoning_progress');
+                const latestWebSearch = [...thinkingEvents].reverse().find(ev => ev.type === 'web_search');
                 const latestReasoning = [...thinkingEvents].reverse().find(ev => ev.type === 'reasoning');
                 const reasoningLine = (() => {
                   if (!latestReasoning || typeof latestReasoning.content !== 'string') return '';
@@ -4151,7 +4152,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                   );
                 };
 
-                if (!latestPlan && !reasoningLine) return null;
+                if (!latestPlan && !reasoningLine && !latestWebSearch) return null;
 
                 return (
                   <div className="space-y-2">
@@ -4160,6 +4161,15 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                         key={latestPlan.id}
                         type="reasoning_progress"
                         content={latestPlan.content}
+                      />
+                    )}
+                    {/* Show web search activity when no content has streamed yet - provides early user feedback */}
+                    {latestWebSearch && streamingMessage === '' && (
+                      <ThinkingIndicator
+                        key={latestWebSearch.id}
+                        type="web_search"
+                        query={latestWebSearch.query}
+                        sources={latestWebSearch.sources}
                       />
                     )}
                     {renderReasoningSummary()}

@@ -184,7 +184,7 @@ export function ThinkingIndicator({ type, content, query, sources, url, count, c
           )}
           {isExpanded && normalizedChecklist && (
             <div className="pl-8 pr-2">
-              <Streamdown className="text-gray-700 text-xs leading-relaxed bg-white/60 p-3 rounded-xl border border-gray-100/50 prose prose-sm max-w-none">
+              <Streamdown className="text-gray-700 text-xs leading-relaxed bg-white/60 p-3 rounded-xl border border-gray-100/50 prose prose-sm max-w-none prose-headings:text-xs prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:mt-2 prose-headings:mb-1">
                 {normalizedChecklist}
               </Streamdown>
             </div>
