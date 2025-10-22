@@ -55,7 +55,7 @@ export function SaveSignatureDialog({ open, onClose, onSaved, defaultName = '', 
       const mergedProfile: any = { user_role: title };
       const meta: any = { email_signature: signature, sender_name: name };
       mergedProfile.metadata = meta;
-      const resp = await fetch('/api/update-profile', {
+      const resp = await fetch('/api/profiles/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(authHeader ? { Authorization: authHeader } : {}) },
         body: JSON.stringify({ profile: mergedProfile })

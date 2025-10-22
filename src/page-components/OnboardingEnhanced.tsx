@@ -873,7 +873,7 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          fetch('/api/update-profile', {
+          fetch('/api/profiles/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
             body: JSON.stringify({ prompt_config: { preferred_research_type: 'deep' } })

@@ -635,7 +635,7 @@ export function CompanyProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const res = await fetch('/api/update-profile', {
+      const res = await fetch('/api/profiles/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1224,7 +1224,7 @@ Onboarding flow:
           }
 
           // Route profile updates through Vercel API proxy
-          const updateProfileUrl = '/api/update-profile';
+          const updateProfileUrl = '/api/profiles/update';
 
           const response = await fetch(updateProfileUrl, {
             method: 'POST',

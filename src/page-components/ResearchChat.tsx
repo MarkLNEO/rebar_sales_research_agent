@@ -2347,7 +2347,7 @@ useEffect(() => {
           const isLocal = host === 'localhost' || host === '127.0.0.1';
           if (!isLocal) {
             const sessionResult = await supabase.auth.getSession();
-            const profileUpdate = await fetch('/api/update-profile', {
+            const profileUpdate = await fetch('/api/profiles/update', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -2516,7 +2516,7 @@ useEffect(() => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const updateProfileUrl = '/api/update-profile';
+      const updateProfileUrl = '/api/profiles/update';
       await fetch(updateProfileUrl, {
         method: 'POST',
         headers: {
@@ -3207,7 +3207,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
           const payload: any = { profile: { metadata } };
           if (trimmedSenderTitle) payload.profile.user_role = trimmedSenderTitle;
           const { data: { session } } = await supabase.auth.getSession();
-          await fetch('/api/update-profile', {
+          await fetch('/api/profiles/update', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -3572,7 +3572,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) continue;
           
-          const updateProfileUrl = '/api/update-profile';
+          const updateProfileUrl = '/api/profiles/update';
           
           const res = await fetch(updateProfileUrl, {
             method: 'POST',
@@ -4353,7 +4353,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                         try {
                           const { data: { session } } = await supabase.auth.getSession();
                           if (!session) throw new Error('Not authenticated');
-                          await fetch('/api/update-profile', {
+                          await fetch('/api/profiles/update', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
                             body: JSON.stringify({ prompt_config: { always_tldr: true } })
@@ -4375,7 +4375,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                         try {
                           const { data: { session } } = await supabase.auth.getSession();
                           if (!session) throw new Error('Not authenticated');
-                          await fetch('/api/update-profile', {
+                          await fetch('/api/profiles/update', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
                             body: JSON.stringify({ prompt_config: { default_output_brevity: 'short' } })
