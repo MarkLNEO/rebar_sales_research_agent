@@ -35,7 +35,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
     }
 
-    // Transform preferences into a key-value object
+    // Transform preferences into array format for component
+    const preferencesArray = (preferences || []).map(pref => ({
+      key: pref.key,
+      value: pref.value,
+      source: pref.source,
+      confidence: pref.confidence,
+      updated_at: pref.updated_at,
+    }));
+
+    // Also create a key-value map for backward compatibility
     const prefsMap: Record<string, any> = {};
     if (preferences) {
       for (const pref of preferences) {
@@ -50,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Transform into resolved preferences format
     const resolved: any = {};
-    
+
     // Group preferences by category
     for (const [key, pref] of Object.entries(prefsMap)) {
       const parts = key.split('.');
@@ -63,9 +72,10 @@ export async function GET(request: NextRequest) {
         resolved[key] = pref.value;
       }
     }
-    
+
     return NextResponse.json({
-      preferences: prefsMap,
+      preferences: preferencesArray,
+      prefsMap: prefsMap,
       resolved: resolved,
       count: preferences?.length || 0,
     });
