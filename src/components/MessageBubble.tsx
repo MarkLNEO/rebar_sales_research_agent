@@ -4,6 +4,7 @@ import { ThumbsUp, ThumbsDown, Copy, RotateCcw, Coins, Building2, CheckCircle2, 
 import { useMemo, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { useToast } from './ToastProvider';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { deriveIcpMeta } from '../utils/researchOutput';
 import { stripClarifierBlocks } from '../utils/markdown';
 
@@ -158,6 +159,7 @@ export function MessageBubble({
   recentlySaved = false,
 }: MessageBubbleProps) {
   const { addToast } = useToast();
+  const { session } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [savingPreference, setSavingPreference] = useState(false);
 
@@ -202,11 +204,23 @@ export function MessageBubble({
 
   // Save preference to database
   const handleSavePreference = async (pref: { key: string; value: string; label: string }) => {
+    if (!session?.access_token) {
+      addToast({
+        type: 'error',
+        title: 'Authentication required',
+        description: 'Please sign in to save preferences.',
+      });
+      return;
+    }
+
     setSavingPreference(true);
     try {
       const response = await fetch('/api/preferences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           key: pref.key,
           value: pref.value,
