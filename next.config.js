@@ -9,8 +9,8 @@ const nextConfig = {
   compress: false,
   poweredByHeader: false,
   
-  // Transpile src directory
-  transpilePackages: [],
+  // Transpile src directory and streamdown package
+  transpilePackages: ['streamdown'],
   
   // API route configuration
   async headers() {
