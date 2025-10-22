@@ -1,5 +1,5 @@
 ---
-trigger: manual
+trigger: always_on
 ---
 
 WE ONLY USE GPT-5 FAMILY LLM MODELS. 
