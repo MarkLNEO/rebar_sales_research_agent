@@ -1,25 +1,81 @@
 import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { authenticateRequest, checkCredits, deductCredits, logUsage } from '../../lib/auth';
-import { buildMemoryBlock } from '../../lib/memory';
-import { fetchUserContext, buildSystemPrompt } from '../../lib/context';
+import { loadFullUserContext } from '../../lib/contextLoader';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-// Helper: Determine reasoning effort dynamically based on task type
-function getReasoningEffort(agentType: string, userMessage: string): 'medium' | 'high' {
-  // NEVER use 'low' - minimum is 'medium' for reasoning visibility
-  
-  // Only use 'high' for extremely complex queries (>300 chars)
-  // Medium is sufficient for most research and prevents 14k+ token reasoning overhead
-  if (userMessage.length > 300) {
-    return 'high';
+// Helper: Determine reasoning effort dynamically based on task type and research mode
+function getReasoningEffort(
+  agentType: string,
+  userMessage: string,
+  researchType?: 'quick' | 'deep' | 'specific'
+): 'medium' | 'high' {
+  // Quick mode: use medium reasoning for speed
+  if (researchType === 'quick') {
+    return 'medium';
   }
-  
+
+  // Specific mode (follow-ups): use medium reasoning
+  if (researchType === 'specific') {
+    return 'medium';
+  }
+
+  // Deep mode: use high reasoning for complex queries
+  if (researchType === 'deep') {
+    return userMessage.length > 300 ? 'high' : 'medium';
+  }
+
   // Default: medium (enables reasoning visibility while saving tokens)
-  // This includes company_research which was previously 'high'
   return 'medium';
+}
+
+// Helper: Add mode-specific instructions to prompt
+function addModeInstructions(basePrompt: string, researchType?: 'quick' | 'deep' | 'specific'): string {
+  if (!researchType || researchType === 'deep') {
+    return basePrompt; // Deep is the default, no modifications needed
+  }
+
+  if (researchType === 'quick') {
+    const quickInstructions = `\n\n## QUICK BRIEF MODE ACTIVE
+
+You are in Quick Brief mode. The user needs a concise, scannable brief they can review in 60-90 seconds before a call.
+
+**Output Requirements:**
+- **Length:** 400-600 words maximum
+- **Structure:** 3-5 key sections only
+- **Bullet points:** Preferred over paragraphs
+- **Speed:** Prioritize time-to-first-byte; reduce web searches to 2-3 max
+
+**Required Sections:**
+1. **Executive Summary** (2-3 sentences)
+2. **Why Now** (2-3 recent signals with dates)
+3. **Key Decision Maker** (1-2 contacts with roles)
+4. **Next Step** (One specific action)
+
+**Omit:** Lengthy background, multiple decision makers, detailed source lists. This is a sprint, not a marathon.`;
+
+    return basePrompt + quickInstructions;
+  }
+
+  if (researchType === 'specific') {
+    const specificInstructions = `\n\n## SPECIFIC/FOLLOW-UP MODE ACTIVE
+
+This is a follow-up question or specific query. The user wants a focused answer, not a full research brief.
+
+**Output Requirements:**
+- **Direct answer first:** Lead with the specific information requested
+- **Concise:** 200-400 words unless more detail explicitly requested
+- **Context-aware:** Reference previous research if available
+- **No boilerplate:** Skip standard brief structure unless it directly answers the question
+
+Example: If asked "What's their tech stack?", list the stack immediately, then add brief context if relevant.`;
+
+    return basePrompt + specificInstructions;
+  }
+
+  return basePrompt;
 }
 
 export async function POST(req: NextRequest) {
@@ -28,21 +84,31 @@ export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
     const body = await req.json();
-    const { messages, chatId, agentType = 'company_research', impersonate_user_id } = body;
+    const {
+      messages,
+      chatId,
+      agentType = 'company_research',
+      impersonate_user_id,
+      research_type, // Extract mode selection from frontend
+    } = body;
 
-    // Authenticate
-    const { user, supabase } = await authenticateRequest(authHeader, impersonate_user_id);
-    
-    // Check credits
-    const creditStatus = await checkCredits(supabase, user.id);
-    
-    // Fetch context
-    const userContext = await fetchUserContext(supabase, user.id);
-    const memoryBlock = await buildMemoryBlock(user.id, agentType);
-    
-    // Build system prompt (now async to fetch learned preferences)
-    const systemPrompt = await buildSystemPrompt(userContext, agentType);
-    const instructions = memoryBlock ? `${systemPrompt}\n\n${memoryBlock}` : systemPrompt;
+    // Authenticate and check credits in PARALLEL
+    const [{ user, supabase }, creditStatus] = await Promise.all([
+      authenticateRequest(authHeader, impersonate_user_id),
+      (async () => {
+        const { user: tempUser, supabase: tempSupabase } = await authenticateRequest(authHeader, impersonate_user_id);
+        return checkCredits(tempSupabase, tempUser.id);
+      })(),
+    ]);
+
+    // Load complete user context with caching (replaces 7-9 sequential queries with 1 cached lookup)
+    const fullContext = await loadFullUserContext(supabase, user.id, agentType);
+
+    // Apply mode-specific instructions based on research_type
+    const modeAdjustedPrompt = addModeInstructions(fullContext.systemPrompt, research_type);
+    const instructions = fullContext.memoryBlock ? `${modeAdjustedPrompt}\n\n${fullContext.memoryBlock}` : modeAdjustedPrompt;
+
+    console.log('[chat] Research mode:', research_type || 'default (deep)', '| Agent type:', agentType);
 
     // Initialize OpenAI
     const openai = new OpenAI({
@@ -111,9 +177,9 @@ export async function POST(req: NextRequest) {
 
           console.log('[chat] Calling OpenAI Responses API...');
 
-          // Determine optimal reasoning effort for this request
-          const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content);
-          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType);
+          // Determine optimal reasoning effort for this request (considering research mode)
+          const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type);
+          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType, 'mode:', research_type);
 
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',

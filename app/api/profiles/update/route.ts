@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '../../lib/auth';
+import { invalidateUserCache } from '../../lib/contextCache';
 
 export const runtime = 'nodejs';
 
@@ -91,6 +92,10 @@ export async function POST(req: NextRequest) {
       }
       results.disqualifying_criteria = disqualifying_criteria.length;
     }
+
+    // Invalidate user context cache so next request fetches fresh data
+    invalidateUserCache(user.id);
+    console.log('[profile update] Invalidated context cache for user:', user.id);
 
     return Response.json({
       success: true,

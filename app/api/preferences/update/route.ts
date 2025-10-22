@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/supabase/types';
+import { invalidateUserCache } from '../../lib/contextCache';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -88,8 +89,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    // Invalidate user context cache so next request fetches fresh data
+    invalidateUserCache(user.id);
+    console.log('[preferences update] Invalidated context cache for user:', user.id);
+
+    return NextResponse.json({
+      success: true,
       message: 'Preferences updated successfully',
       updated: {
         terminology: !!(signal_terminology || criteria_terminology || watchlist_label),
