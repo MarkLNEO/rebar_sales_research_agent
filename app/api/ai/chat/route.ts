@@ -11,12 +11,14 @@ export const maxDuration = 300;
 function getReasoningEffort(agentType: string, userMessage: string): 'medium' | 'high' {
   // NEVER use 'low' - minimum is 'medium' for reasoning visibility
   
-  // Complex research or very long queries: high
-  if (userMessage.length > 200 || agentType === 'company_research') {
+  // Only use 'high' for extremely complex queries (>300 chars)
+  // Medium is sufficient for most research and prevents 14k+ token reasoning overhead
+  if (userMessage.length > 300) {
     return 'high';
   }
   
   // Default: medium (enables reasoning visibility while saving tokens)
+  // This includes company_research which was previously 'high'
   return 'medium';
 }
 
@@ -64,6 +66,10 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let totalTokens = 0;
+        const startTime = Date.now();
+        let firstTokenReceived = false;
+
         try {
           // Send context-appropriate acknowledgment
           const initialStatus = agentType === 'settings_agent' 
@@ -86,19 +92,23 @@ export async function POST(req: NextRequest) {
             instructions,
             input: lastUserMessage.content,
             
+            // Explicitly request reasoning content in stream
+            include: ['reasoning.encrypted_content'] as any,
+            
             // Text formatting with verbosity control
             text: { 
               format: { type: 'text' },
               verbosity: 'medium' as any // Use medium for balanced output (low/medium based on context)
             },
             
-            max_output_tokens: 16000,
+            max_output_tokens: 12000, // Reduced from 16000 to prevent excessive token usage
             tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
             
-            // Dynamic reasoning effort (saves tokens on simple tasks)
+            // Enable reasoning summaries (not raw reasoning)
+            // gpt-5-mini supports 'detailed' summary which streams reasoning_summary_text.delta events
             reasoning: { 
               effort: reasoningEffort,
-              summary: 'detailed' as any // Request detailed reasoning summaries (API accepts: concise, detailed, auto)
+              summary: 'detailed' as any // Required to enable reasoning summary streaming
             },
             
             store: true,
@@ -111,13 +121,19 @@ export async function POST(req: NextRequest) {
             }
           });
 
-          let totalTokens = 0;
-          const startTime = Date.now();
-          let firstTokenReceived = false;
-          let contentBuffer = ''; // Buffer to detect planning checklist
-          let planningExtracted = false;
-
           for await (const event of responseStream as any) {
+            // Log ALL event types to debug streaming (including deltas)
+            if (event.type) {
+              // Log non-delta events normally
+              if (!event.type.includes('delta')) {
+                console.log('[chat] Event type:', event.type);
+              } else {
+                // Log delta events with first 50 chars of content
+                const preview = event.delta ? String(event.delta).substring(0, 50) : '';
+                console.log('[chat] Event type:', event.type, preview ? `"${preview}..."` : '');
+              }
+            }
+            
             // Send progress on first token (skip for profile coach to reduce noise)
             if (!firstTokenReceived && event.type === 'response.output_text.delta' && agentType !== 'settings_agent') {
               firstTokenReceived = true;
@@ -127,14 +143,50 @@ export async function POST(req: NextRequest) {
               })}\n\n`));
             }
             
-            // Stream reasoning/thinking process
+            // Stream reasoning/thinking process - handle all reasoning event variants
             if (event.type === 'response.reasoning.delta' && event.delta) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                 type: 'reasoning',
                 content: event.delta
               })}\n\n`));
+              continue;
             }
-            
+
+            // Reasoning text deltas (documented in Responses API spec)
+            if (event.type === 'response.reasoning_text.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning',
+                content: event.delta
+              })}\n\n`));
+              continue;
+            }
+
+            // Reasoning summary text deltas (documented in Responses API spec)
+            if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning',
+                content: event.delta
+              })}\n\n`));
+              continue;
+            }
+
+            // Older/alternate Responses API variants for reasoning output
+            if (event.type === 'response.thinking.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning',
+                content: event.delta
+              })}\n\n`));
+              continue;
+            }
+
+            if (event.type === 'response.reasoning_output_text.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'reasoning',
+                content: event.delta
+              })}\n\n`));
+              continue;
+            }
+
             // Stream planning/step progress
             if (event.type === 'response.reasoning_progress' && event.content) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -143,56 +195,12 @@ export async function POST(req: NextRequest) {
               })}\n\n`));
             }
             
-            // Transform OpenAI Responses API events to frontend-compatible format
+            // Stream content directly without buffering or extraction
             if (event.type === 'response.output_text.delta' && event.delta) {
-              // Buffer content to detect planning checklist
-              contentBuffer += event.delta;
-              
-              // Try to extract planning checklist from beginning of response
-              // Updated to match 🏯 emoji (castle) per OpenAI optimization
-              if (!planningExtracted && contentBuffer.length > 50) {
-                // More flexible regex: match planning with various formats
-                const planMatch = contentBuffer.match(/[🎯🏯]\s*(?:Research\s+)?Plan:?\s*\n([\s\S]{10,800}?)(?=\n\n(?:Progress update|Purpose:|##|Checking|$))/);
-                if (planMatch) {
-                  planningExtracted = true;
-                  const planContent = planMatch[0].trim();
-                  
-                  console.log('[chat] Extracted planning checklist:', planContent.substring(0, 100));
-                  
-                  // Send planning as reasoning_progress event
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                    type: 'reasoning_progress',
-                    content: planContent
-                  })}\n\n`));
-                  
-                  // Continue with content AFTER the plan (skip the plan itself)
-                  const afterPlan = contentBuffer.substring(planMatch.index! + planMatch[0].length);
-                  if (afterPlan.trim()) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                      type: 'content',
-                      content: afterPlan
-                    })}\n\n`));
-                  }
-                  contentBuffer = ''; // Clear buffer
-                  continue;
-                }
-              }
-              
-              // If no planning detected yet and buffer is large, start sending content
-              if (!planningExtracted && contentBuffer.length > 800) {
-                planningExtracted = true; // Stop looking
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  type: 'content',
-                  content: contentBuffer
-                })}\n\n`));
-                contentBuffer = '';
-              } else if (planningExtracted) {
-                // Already extracted or not present, stream content normally
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  type: 'content',
-                  content: event.delta
-                })}\n\n`));
-              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'content',
+                content: event.delta
+              })}\n\n`));
             }
 
             // Track token usage from response.done event

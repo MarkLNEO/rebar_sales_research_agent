@@ -154,28 +154,6 @@ Your core mission is to convert hours of manual research into seconds of actiona
 
 ---
 
-## Planning
-
-Begin each research task by outputting a concise conceptual checklist (3–7 bullets) summarizing your planned approach. Format it exactly as below (using the 🏯 emoji):
-
-🏯 Research Plan:
-- [First step you will investigate]
-- [Second investigative step]
-- [Third investigative step]
-- ...
-
-**Example:**
-🏯 Research Plan:
-- Assess ICP fit based on industry and company size
-- Search for recent buying signals (funding, hiring, tech changes)
-- Identify key decision makers and personalization angles
-- Analyze timing and urgency factors
-- Synthesize into actionable recommendations
-
-Checklist must remain conceptual (what you'll investigate), not technical (how you'll do it). After planning, insert a blank line. Proceed to research, and at each major milestone, provide a brief status micro-update (1–3 sentences) on progress, next steps, and any blockers.
-
----
-
 ${learnedPrefsSection ? learnedPrefsSection + '\n\n---\n\n' : ''}
 
 ## Instruction Hierarchy
@@ -184,17 +162,6 @@ ${learnedPrefsSection ? learnedPrefsSection + '\n\n---\n\n' : ''}
 2. Complete research autonomously before seeking user input.
 3. Balance research speed and depth per task complexity and user preferences.
 4. Adhere to user's output formatting and style preferences.
-
----
-
-## Tool Preambles & Progress Updates
-
-- Before each web search or significant new action, clearly state your purpose and required inputs in one line.
-  - Format: "🔍 Purpose: [reason]. Inputs: [search targets]"
-  - Example: "🔍 Purpose: Find recent buying signals. Inputs: Funding rounds, acquisitions, hiring (last 90 days)"
-- Provide concise, friendly progress updates at key milestones (5–10 words with emoji) to keep the user informed (e.g., "Checking recent funding and leadership changes...").
-- Upon project completion, provide a clear signal (e.g., "✅ Research complete. Here are your actionable insights...").
-- Never skip preambles—they are essential for transparency and rationale.
 
 ---
 
@@ -408,13 +375,16 @@ Use this ICP to score companies (0-100%) and focus research on fit indicators.
     prompt += `\n</user_context>`;
   }
 
-  if (customCriteria?.length > 0) {
+  // Only include custom criteria if they have valid names
+  const validCriteria = customCriteria?.filter((c: any) => c?.name && c.name.trim().length > 0) || [];
+  
+  if (validCriteria.length > 0) {
     const criteriaTerm = profile?.criteria_terminology || 'Custom Criteria';
     prompt += `
 ## Custom Criteria (evaluate each line):
 
 `;
-    customCriteria.forEach((c: any, idx: number) => {
+    validCriteria.forEach((c: any, idx: number) => {
       const importance = c.importance === 'critical' ? '(critical)' : 
                         c.importance === 'important' ? '(important)' : '';
       prompt += `${idx + 1}. **${c.name}** ${importance}: Met/Not Met/Unknown, include clear evidence and source\n`;

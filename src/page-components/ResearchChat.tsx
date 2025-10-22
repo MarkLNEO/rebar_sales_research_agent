@@ -1264,6 +1264,7 @@ useEffect(() => {
         const jobs = data || [];
         if (jobs.length === 0) {
           setBulkProgress(null);
+          stop();
           return;
         }
         const totals = jobs.reduce((acc, j: any) => {
@@ -1277,7 +1278,7 @@ useEffect(() => {
     };
     const start = () => {
       void poll();
-      timer = setInterval(poll, 5000);
+      timer = setInterval(poll, 10000);
     };
     const stop = () => { if (timer) clearInterval(timer); timer = null; };
     start();
@@ -2313,20 +2314,7 @@ useEffect(() => {
               : null;
         setActionBarCompany(nextCompany);
         setActionBarVisible(true);
-        if (nextCompany) {
-          ensureTrackedAccount(nextCompany)
-            .then((newlyTracked) => {
-              if (newlyTracked) {
-                addToast({
-                  type: 'success',
-                  title: `${nextCompany} added to tracking`,
-                  description: 'I’ll keep monitoring signals for this account.',
-                });
-                try { window.dispatchEvent(new CustomEvent('show-tracked-accounts')); } catch {}
-              }
-            })
-            .catch((err) => console.warn('Auto-track failed', err));
-        }
+        // Removed automatic tracking - users should explicitly choose to track accounts
       }
 
       // JIT prompts based on usage milestones and profile state
@@ -2619,8 +2607,19 @@ useEffect(() => {
       const defaultTemplateId = getDefaultTemplate().id;
       const includeTemplate = depth !== 'specific' && selectedTemplate && selectedTemplateId && selectedTemplateId !== defaultTemplateId;
 
+      const historyWithCurrent = (() => {
+        const cloned = [...history];
+        const last = cloned[cloned.length - 1];
+        if (!last || last.role !== 'user') {
+          cloned.push({ role: 'user', content: enrichedMessage });
+        } else {
+          cloned[cloned.length - 1] = { role: 'user', content: enrichedMessage };
+        }
+        return cloned;
+      })();
+
       const requestPayload = JSON.stringify({
-        messages: [...history, { role: 'user', content: userMessage }],
+        messages: historyWithCurrent,
         stream: true,
         chatId: chatId ?? currentChatId,
         config: {
@@ -2734,6 +2733,7 @@ useEffect(() => {
       let buffer = '';
       let usedTokens: number | null = null;
       let firstDeltaAt: number | null = null;
+      let shouldExit = false; // Flag to exit the outer streaming loop
       const markFirstDelta = () => {
         if (firstDeltaAt == null) {
           firstDeltaAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -2987,6 +2987,13 @@ useEffect(() => {
                   setThinkingEvents(prev =>
                     prev.filter(e => !(e.type === 'reasoning_progress' && (e.content || '').toLowerCase().includes('summary')))
                   );
+                } else if (parsed.type === 'done') {
+                  // Stream completion signal from backend
+                  if (parsed.tokens) {
+                    usedTokens = Number(parsed.tokens) || usedTokens;
+                  }
+                  // Set flag to exit the outer streaming loop
+                  shouldExit = true;
                 } else if (parsed.type === 'response.completed' && parsed.response?.usage?.total_tokens) {
                   usedTokens = Number(parsed.response.usage.total_tokens) || usedTokens;
                 } else if (parsed.type === 'response' && parsed.usage?.total_tokens) {
@@ -2995,6 +3002,8 @@ useEffect(() => {
               } catch {}
             }
           }
+          // Exit outer loop if done event was received
+          if (shouldExit) break;
         }
       }
       if (usedTokens != null) {
@@ -3029,7 +3038,7 @@ useEffect(() => {
           detail: {
             page: 'research',
             totalMs: endedAt - startedAt,
-            ttfbMs: firstDeltaAt != null ? (firstDeltaAt - startedAt) : null,
+            ttfbMs: (firstDeltaAt != null ? (firstDeltaAt - startedAt) : null) as number | null,
             tokens: usedTokens,
           }
         }));
