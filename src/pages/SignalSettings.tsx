@@ -149,7 +149,7 @@ export function SignalSettings() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Signal Settings</h1>
-            <p className="text-sm text-gray-600">Control which buying signals the agent should monitor.</p>
+            <p className="text-sm text-gray-600">Define custom signals to track. Examples: &quot;Funding Round&quot;, &quot;New CTO&quot;, &quot;AWS Migration&quot;.</p>
           </div>
         </div>
       </div>
