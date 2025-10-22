@@ -7,6 +7,23 @@ import { fetchUserContext, buildSystemPrompt } from '../../lib/context';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+// Helper: Determine reasoning effort dynamically based on task type
+function getReasoningEffort(agentType: string, userMessage: string): 'low' | 'medium' | 'high' {
+  // Quick brief or short follow-ups: low
+  if (agentType === 'quick') {
+    return 'low';
+  }
+  
+  // Very short questions (< 50 chars) likely follow-ups: low
+  if (userMessage.length < 50) {
+    return 'low';
+  }
+  
+  // Deep research: medium (default, balances quality and speed)
+  // Complex multi-step tasks: high (rare, only when explicitly needed)
+  return 'medium';
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   
@@ -66,6 +83,10 @@ export async function POST(req: NextRequest) {
             content: 'Analyzing sources and gathering intelligence...'
           })}\n\n`));
 
+          // Determine optimal reasoning effort for this request
+          const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content);
+          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType);
+
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
             instructions,
@@ -73,13 +94,20 @@ export async function POST(req: NextRequest) {
             text: { format: { type: 'text' } },
             max_output_tokens: 16000,
             tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
-            reasoning: { effort: 'medium' },
+            
+            // Dynamic reasoning effort (saves tokens on simple tasks)
+            reasoning: { effort: reasoningEffort },
+            
+            // Verbosity control (can be overridden in prompt for specific sections)
+            verbosity: 'medium' as any, // medium balances detail with conciseness
+            
             store: true,
             metadata: {
               user_id: user.id,
               chat_id: chatId,
               agent_type: agentType,
-              research_type: agentType === 'company_research' ? 'deep' : 'standard'
+              research_type: agentType === 'company_research' ? 'deep' : 'standard',
+              reasoning_effort: reasoningEffort // Track for analytics
             }
           });
 
