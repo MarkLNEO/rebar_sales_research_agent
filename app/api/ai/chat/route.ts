@@ -298,6 +298,40 @@ export async function POST(req: NextRequest) {
               })}\n\n`));
             }
 
+            // Handle web search tool use events
+            if (event.type === 'response.tool_use.started' && event.tool_use?.type === 'web_search') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'web_search',
+                query: event.tool_use?.query || 'Searching...'
+              })}\n\n`));
+            }
+
+            if (event.type === 'response.tool_use.completed' && event.tool_use?.type === 'web_search') {
+              const sources = event.tool_use?.result?.results?.map((r: any) => r.url) || [];
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'web_search',
+                query: event.tool_use?.query || 'Search completed',
+                sources: sources.slice(0, 8) // Limit to 8 sources for UI
+              })}\n\n`));
+            }
+
+            // Handle generic web search events (if API uses different naming)
+            if (event.type === 'response.web_search.started') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'web_search',
+                query: event.query || 'Searching the web...'
+              })}\n\n`));
+            }
+
+            if (event.type === 'response.web_search.completed') {
+              const sources = event.results?.map((r: any) => r.url) || [];
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'web_search',
+                query: event.query || 'Search completed',
+                sources: sources.slice(0, 8)
+              })}\n\n`));
+            }
+
             // Stream content directly - try multiple possible event types
             if (event.type === 'response.output_text.delta' && event.delta) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
