@@ -91,15 +91,18 @@ export async function POST(req: NextRequest) {
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
             instructions,
             input: lastUserMessage.content,
-            text: { format: { type: 'text' } },
+            
+            // Text formatting with verbosity control
+            text: { 
+              format: { type: 'text' },
+              verbosity: 'medium' as any // Nested under text per API docs
+            },
+            
             max_output_tokens: 16000,
             tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
             
             // Dynamic reasoning effort (saves tokens on simple tasks)
             reasoning: { effort: reasoningEffort },
-            
-            // Verbosity control (can be overridden in prompt for specific sections)
-            verbosity: 'medium' as any, // medium balances detail with conciseness
             
             store: true,
             metadata: {
