@@ -1,33 +1,47 @@
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - generic [ref=e3]:
-    - generic [ref=e4]:
-      - img [ref=e6]
-      - heading "RebarHQ Research Agent" [level=1] [ref=e9]
-      - paragraph [ref=e10]: AI-powered sales intelligence platform
-      - generic [ref=e11]:
-        - generic [ref=e12]: Powered by
-        - img "RebarHQ" [ref=e13]
-    - generic [ref=e14]:
-      - heading "Sign In" [level=2] [ref=e15]
-      - generic [ref=e16]: Invalid email or password. Please try again.
-      - generic [ref=e17]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Welcome Agent" [level=1] [ref=e10]
+    - generic [ref=e13]:
+      - generic [ref=e14]: 👋
+      - generic [ref=e15]:
+        - generic [ref=e17]: Hey! I'm your Welcome Agent.
         - generic [ref=e18]:
-          - generic [ref=e19]: Email
-          - textbox "you@company.com" [ref=e20]: cliff.test@rebarhq.com
-        - generic [ref=e21]:
-          - generic [ref=e22]:
-            - generic [ref=e23]: Password
-            - button "Forgot password" [ref=e24] [cursor=pointer]: Forgot password?
-          - textbox "••••••••" [ref=e25]: Test123!@#
-        - button "Sign In" [ref=e26] [cursor=pointer]
-      - generic [ref=e27]:
-        - text: Don't have an account?
-        - link "Sign up" [ref=e28] [cursor=pointer]:
-          - /url: /signup
-    - paragraph [ref=e29]: 2023 RebarHQ. All rights reserved.
+          - text: I help sales teams research companies, find hot leads, and track accounts.
+          - text: "What I can do (besides individual research):"
+          - list [ref=e19]:
+            - listitem [ref=e20]: Run bulk research from a CSV for many companies
+            - listitem [ref=e21]: Track accounts and monitor signals (breaches, leadership changes, funding)
+            - listitem [ref=e22]: Save reports, export to PDF, and draft outreach
+            - listitem [ref=e23]: Summarize any response (High Level + key bullets)
+          - generic [ref=e24]: "How it works: Ask me anything and I’ll adapt — or set me up in 5 minutes."
+        - generic [ref=e25]:
+          - generic [ref=e26] [cursor=pointer]:
+            - generic [ref=e27]: 🛠️
+            - generic [ref=e28]: Take 5 minutes to set up your Research Agent
+            - generic [ref=e29]: Help me help you — I’ll personalize research, signals, and contacts.
+            - generic [ref=e30]: I’ll ask about your role, what you’re looking for, and what data matters.
+          - generic [ref=e31] [cursor=pointer]:
+            - generic [ref=e32]: 🚀
+            - generic [ref=e33]: Dive into research now
+            - generic [ref=e34]: Set it up as you go — I’ll automate and learn.
+            - generic [ref=e35]:
+              - button "Research Boeing" [ref=e36]
+              - button "Find companies like Stripe" [ref=e37]
+              - button "What can you do?" [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: What should I get ready for you?
+        - paragraph [ref=e43]: Jump straight into research or let me gather preferences—either way, you can change these anytime.
+        - textbox "Onboarding input" [active] [ref=e44]:
+          - /placeholder: Research Boeing or “Help me set up”
+      - button "Continue onboarding" [disabled] [ref=e46]:
+        - img [ref=e47]
+        - generic [ref=e50]: Continue
   - status
-  - alert [ref=e30]
+  - alert [ref=e51]
 ```

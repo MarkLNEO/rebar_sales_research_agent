@@ -18,19 +18,19 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Test user credentials (create these in Supabase manually or via setup script)
 export const TEST_USERS = {
   cliff: {
-    email: 'cliff.test@rebarhq.com',
+    email: 'cliff.test@nevereverordinary.com',
     password: 'Test123!@#',
     role: 'Account Executive',
     company: 'Acme Security Solutions',
   },
   sarah: {
-    email: 'sarah.test@rebarhq.com',
+    email: 'sarah.test@nevereverordinary.com',
     password: 'Test123!@#',
     role: 'Sales Director',
     company: 'TechCorp Inc',
   },
   new_user: {
-    email: `test-${Date.now()}@rebarhq.com`,
+    email: `test-${Date.now()}@nevereverordinary.com`,
     password: 'Test123!@#',
   },
 };

@@ -7,12 +7,12 @@ import { chromium } from 'playwright';
 
 const TEST_USERS = [
   {
-    email: 'cliff.test@rebarhq.com',
+    email: 'cliff.test@nevereverordinary.com',
     password: 'Test123!@#',
     name: 'Cliff Test',
   },
   {
-    email: 'sarah.test@rebarhq.com',
+    email: 'sarah.test@nevereverordinary.com',
     password: 'Test123!@#',
     name: 'Sarah Test',
   }
