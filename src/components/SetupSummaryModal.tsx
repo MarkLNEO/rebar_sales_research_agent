@@ -161,10 +161,12 @@ export const SetupSummaryModal: FC<SetupSummaryModalProps> = ({ open, loading, d
                   {data.signalPreferences && data.signalPreferences.length > 0 ? (
                     <div className="space-y-2">
                       {data.signalPreferences.map(signal => (
-                        <div key={`${signal.signal_type}-${signal.importance}`} className="flex flex-wrap gap-2">
-                          {badge(signal.signal_type, 'primary')}
-                          {badge(signal.importance)}
-                          {typeof signal.lookback_days === 'number' ? badge(`${signal.lookback_days}d lookback`) : null}
+                        <div key={`${signal.signal_type}-${signal.importance}`} className="text-sm">
+                          <span className="font-medium text-gray-900">{signal.signal_type}</span>
+                          <span className="text-gray-500 ml-2">• {signal.importance}</span>
+                          {typeof signal.lookback_days === 'number' ? (
+                            <span className="text-gray-500 ml-2">({signal.lookback_days}d)</span>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -181,9 +183,9 @@ export const SetupSummaryModal: FC<SetupSummaryModalProps> = ({ open, loading, d
                 {data.customCriteria && data.customCriteria.length > 0 ? (
                   <div className="space-y-2">
                     {data.customCriteria.map((criterion, index) => (
-                      <div key={`${criterion.name}-${index}`} className="flex flex-wrap gap-2">
-                        {badge(criterion.name, 'primary')}
-                        {badge(criterion.importance)}
+                      <div key={`${criterion.name}-${index}`} className="text-sm">
+                        <span className="font-medium text-gray-900">{criterion.name}</span>
+                        <span className="text-gray-500 ml-2">• {criterion.importance}</span>
                       </div>
                     ))}
                   </div>

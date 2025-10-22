@@ -1398,12 +1398,14 @@ Onboarding flow:
 
             {initializing ? (
               <div className="flex flex-col items-center justify-center h-96">
-                <div className="flex gap-1 mb-4">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                  </div>
+                  <span className="text-amber-800 text-sm font-medium">Loading your profile...</span>
                 </div>
-                <p className="text-gray-600 text-sm">Initializing...</p>
               </div>
             ) : (
               <div className="space-y-6">
