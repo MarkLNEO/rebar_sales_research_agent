@@ -367,6 +367,13 @@ const SIMPLE_FOLLOW_UP = /^(who|what|when|where|which|how|is|are|was|were|do|doe
 function inferResearchMode(prompt: string): 'deep' | 'quick' | 'specific' {
   const trimmed = prompt.trim();
   if (!trimmed) return 'deep';
+
+  // Check for quick mode keywords
+  const quickKeywords = /\b(quick|brief|summary|short|scan|skim|tldr|tl;dr|snapshot|overview)\b/i;
+  if (quickKeywords.test(trimmed)) {
+    return 'quick';
+  }
+
   const words = trimmed.split(/\s+/).filter(Boolean);
   const looksLikeQuestion = trimmed.endsWith('?') || SIMPLE_FOLLOW_UP.test(trimmed);
   if (looksLikeQuestion && words.length <= 12) {
