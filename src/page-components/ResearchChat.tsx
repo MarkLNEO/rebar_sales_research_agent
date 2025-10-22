@@ -436,6 +436,8 @@ export function ResearchChat() {
   };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoSentRef = useRef(false);
+  const reasoningBufferRef = useRef<string>('');
+  const reasoningFlushTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [focusComposerTick, setFocusComposerTick] = useState(0);
   const [preferredResearchType, setPreferredResearchType] = useState<'deep' | 'quick' | 'specific' | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -1719,22 +1721,23 @@ useEffect(() => {
       const subjectForToast = (activeSubject && activeSubject.trim().length > 0)
         ? activeSubject
         : (draft.subject || '').trim();
+      // Always show toast notification for save
       if (subjectForToast) {
         // Ensure an account exists for this subject so saves and dashboard stay unified
         const newlyTracked = await ensureTrackedAccount(subjectForToast);
         addToast({
           type: 'success',
-          title: newlyTracked ? 'Tracked and saved' : 'Saved to history',
+          title: newlyTracked ? '✓ Tracked and saved' : '✓ Research saved',
           description: newlyTracked
-            ? `${subjectForToast} is now tracked. You will see it on your dashboard.`
-            : `Attached to ${subjectForToast}. Find it in Tracked Accounts.`,
+            ? `${subjectForToast} is now tracked. View in Tracked Accounts.`
+            : `Saved to ${subjectForToast}. View in Research History.`,
         });
       } else {
         addToast({
           type: 'success',
-          title: 'Saved to history',
-          description: 'Find it in Research History → Recent saved.',
-          actionText: 'Open history',
+          title: '✓ Research saved',
+          description: 'Find it in Research History.',
+          actionText: 'View history',
           onAction: () => router.push('/research')
         });
       }
@@ -2065,6 +2068,12 @@ useEffect(() => {
     setLoading(true);
     setStreamingMessage('');
     setThinkingEvents([]);
+    // Clear reasoning buffer when starting new request
+    reasoningBufferRef.current = '';
+    if (reasoningFlushTimerRef.current) {
+      clearTimeout(reasoningFlushTimerRef.current);
+      reasoningFlushTimerRef.current = null;
+    }
     setActionBarVisible(false);
     setActionBarCompany(null);
     assistantInsertedRef.current = false;
@@ -2792,16 +2801,33 @@ useEffect(() => {
                 else if (parsed.type === 'acknowledgment') {
                   setThinkingEvents(prev => [...prev, { id: `ack-${Date.now()}`, type: 'acknowledgment', content: parsed.content }]);
                 }
-                // Handle reasoning events - UPDATE existing reasoning indicator
+                // Handle reasoning events - batch updates to avoid hundreds of re-renders
                 else if (parsed.type === 'reasoning') {
                   markFirstDelta();
-                  setThinkingEvents(prev => {
-                    const existing = prev.find(e => e.type === 'reasoning');
-                    if (existing) {
-                      return prev.map(e => e.type === 'reasoning' ? { ...e, content: (e.content || '') + parsed.content } : e);
+
+                  // Accumulate reasoning content in a ref (doesn't trigger re-render)
+                  if (!reasoningBufferRef.current) {
+                    reasoningBufferRef.current = '';
+                  }
+                  reasoningBufferRef.current += parsed.content;
+
+                  // Debounce UI updates to every 100ms instead of per-character
+                  if (reasoningFlushTimerRef.current) {
+                    clearTimeout(reasoningFlushTimerRef.current);
+                  }
+
+                  reasoningFlushTimerRef.current = setTimeout(() => {
+                    const buffered = reasoningBufferRef.current || '';
+                    if (buffered) {
+                      setThinkingEvents(prev => {
+                        const existing = prev.find(e => e.type === 'reasoning');
+                        if (existing) {
+                          return prev.map(e => e.type === 'reasoning' ? { ...e, content: buffered } : e);
+                        }
+                        return [...prev, { id: 'reasoning-main', type: 'reasoning', content: buffered }];
+                      });
                     }
-                    return [...prev, { id: 'reasoning-main', type: 'reasoning', content: parsed.content }];
-                  });
+                  }, 100); // Update UI max every 100ms
                 }
                 // Handle reasoning progress
                 else if (parsed.type === 'reasoning_progress') {
@@ -2992,6 +3018,24 @@ useEffect(() => {
                   if (parsed.tokens) {
                     usedTokens = Number(parsed.tokens) || usedTokens;
                   }
+
+                  // Flush any remaining buffered reasoning content
+                  if (reasoningFlushTimerRef.current) {
+                    clearTimeout(reasoningFlushTimerRef.current);
+                    reasoningFlushTimerRef.current = null;
+                  }
+                  if (reasoningBufferRef.current) {
+                    const buffered = reasoningBufferRef.current;
+                    setThinkingEvents(prev => {
+                      const existing = prev.find(e => e.type === 'reasoning');
+                      if (existing) {
+                        return prev.map(e => e.type === 'reasoning' ? { ...e, content: buffered } : e);
+                      }
+                      return [...prev, { id: 'reasoning-main', type: 'reasoning', content: buffered }];
+                    });
+                    reasoningBufferRef.current = '';
+                  }
+
                   // Set flag to exit the outer streaming loop
                   shouldExit = true;
                 } else if (parsed.type === 'response.completed' && parsed.response?.usage?.total_tokens) {
@@ -3815,42 +3859,6 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                       </div>
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        setInputValue('Research ');
-                        setFocusComposerTick(t => t + 1);
-                      }}
-                      className="px-3 py-1.5 text-xs bg-gray-100 rounded-full hover:bg-gray-200 text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      aria-label="Suggestion: Research a company"
-                    >
-                      Research a company
-                    </button>
-                    <button
-                      onClick={() => setBulkResearchOpen(true)}
-                      className="px-3 py-1.5 text-xs bg-gray-100 rounded-full hover:bg-gray-200 text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      aria-label="Suggestion: Upload a list"
-                    >
-                      Upload a list
-                    </button>
-                    <button
-                      onClick={() => startSuggestion('Find security and IT decision makers at my tracked accounts')}
-                      className="px-3 py-1.5 text-xs bg-gray-100 rounded-full hover:bg-gray-200 text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      aria-label="Suggestion: Find contacts"
-                    >
-                      Find contacts
-                    </button>
-                    <button
-                      onClick={() => {
-                        const icp = userProfile?.icp_definition || userProfile?.icp || 'my ideal customer profile';
-                        startSuggestion(`Find companies that match this ICP: ${icp}`);
-                      }}
-                      className="px-3 py-1.5 text-xs bg-gray-100 rounded-full hover:bg-gray-200 text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      aria-label="Suggestion: Find ICP matches"
-                    >
-                      Find ICP matches
-                    </button>
-                  </div>
               </div>
               
               {/* Bulk Research Status */}

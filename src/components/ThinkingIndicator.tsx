@@ -84,10 +84,18 @@ export function ThinkingIndicator({ type, content, query, sources, url, count, c
   // Handle status messages (progress indicators)
   if (type === 'status') {
     return (
-      <div className="flex gap-3 items-start mb-3 animate-fadeIn">
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
-          <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
-          <span className="text-blue-900 font-medium">{content || 'Processing...'}</span>
+      <div className="space-y-3 mb-3 animate-fadeIn">
+        <div className="flex gap-3 items-start">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+            <span className="text-blue-900 font-medium">{content || 'Processing...'}</span>
+          </div>
+        </div>
+        {/* Skeleton loader to show content is being prepared */}
+        <div className="space-y-2 animate-pulse">
+          <div className="h-4 bg-gray-200/60 rounded-lg w-3/4"></div>
+          <div className="h-4 bg-gray-200/60 rounded-lg w-full"></div>
+          <div className="h-4 bg-gray-200/60 rounded-lg w-5/6"></div>
         </div>
       </div>
     );

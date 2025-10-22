@@ -71,11 +71,39 @@ export async function POST(req: NextRequest) {
         let firstTokenReceived = false;
 
         try {
-          // Send context-appropriate acknowledgment
-          const initialStatus = agentType === 'settings_agent' 
-            ? 'Reviewing your profile...'
-            : 'Starting research...';
-          
+          // Send context-appropriate acknowledgment based on agent type and user input
+          let initialStatus = 'Starting research...';
+
+          if (agentType === 'settings_agent') {
+            initialStatus = 'Reviewing your profile...';
+          } else {
+            const userInput = lastUserMessage.content.toLowerCase();
+
+            // Check for follow-up patterns
+            if (userInput.includes('what about') || userInput.includes('tell me more') ||
+                userInput.includes('how about') || messages.length > 2) {
+              initialStatus = 'Analyzing your question...';
+            }
+            // Check for specific research patterns
+            else if (userInput.includes('research') || userInput.includes('company') ||
+                     userInput.includes('account')) {
+              initialStatus = 'Researching company...';
+            }
+            // Check for contact/people finding
+            else if (userInput.includes('contact') || userInput.includes('decision maker') ||
+                     userInput.includes('people')) {
+              initialStatus = 'Finding contacts...';
+            }
+            // Check for list/bulk operations
+            else if (userInput.includes('list') || userInput.includes('companies that')) {
+              initialStatus = 'Analyzing criteria...';
+            }
+            // Default for ambiguous queries
+            else {
+              initialStatus = 'Processing your request...';
+            }
+          }
+
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'status',
             content: initialStatus
@@ -121,16 +149,17 @@ export async function POST(req: NextRequest) {
             }
           });
 
+          let eventCount = 0;
           for await (const event of responseStream as any) {
-            // Log ALL event types to debug streaming (including deltas)
+            eventCount++;
+
+            // Log ALL event types for debugging
             if (event.type) {
-              // Log non-delta events normally
-              if (!event.type.includes('delta')) {
-                console.log('[chat] Event type:', event.type);
-              } else {
-                // Log delta events with first 50 chars of content
-                const preview = event.delta ? String(event.delta).substring(0, 50) : '';
-                console.log('[chat] Event type:', event.type, preview ? `"${preview}..."` : '');
+              // Log full structure for first 10 events AND for any delta events
+              if (eventCount <= 10 || event.type.includes('delta') || event.type.includes('message') || event.type.includes('text')) {
+                console.log(`[chat] Event #${eventCount}:`, event.type, JSON.stringify(event, null, 2).substring(0, 500));
+              } else if (!event.type.includes('delta')) {
+                console.log(`[chat] Event #${eventCount}:`, event.type);
               }
             }
             
@@ -195,7 +224,15 @@ export async function POST(req: NextRequest) {
               })}\n\n`));
             }
             
-            // Stream content directly without buffering or extraction
+            // Handle reasoning output item - show "thinking" indicator
+            if (event.type === 'response.output_item.added' && event.item?.type === 'reasoning') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'thinking',
+                content: 'Researching and analyzing...'
+              })}\n\n`));
+            }
+
+            // Stream content directly - try multiple possible event types
             if (event.type === 'response.output_text.delta' && event.delta) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                 type: 'content',
@@ -203,9 +240,37 @@ export async function POST(req: NextRequest) {
               })}\n\n`));
             }
 
+            // Try response.text.delta variant
+            if (event.type === 'response.text.delta' && event.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'content',
+                content: event.delta
+              })}\n\n`));
+            }
+
+            // Try message delta variant
+            if (event.type === 'response.message.delta' && event.delta?.content) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'content',
+                content: event.delta.content
+              })}\n\n`));
+            }
+
             // Track token usage from response.done event
             if (event.type === 'response.done') {
               totalTokens = event.response?.usage?.total_tokens || 0;
+
+              // If we didn't stream any content, extract it from final response
+              if (!firstTokenReceived && event.response?.output) {
+                console.log('[chat] No streaming - extracting from final response');
+                const textOutput = event.response.output.find((item: any) => item.type === 'message');
+                if (textOutput?.content) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: 'content',
+                    content: textOutput.content
+                  })}\n\n`));
+                }
+              }
             }
           }
 
