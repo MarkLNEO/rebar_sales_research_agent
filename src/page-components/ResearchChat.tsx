@@ -119,6 +119,36 @@ const normalizeCompanyNameForTracking = (value: string | null | undefined): stri
     .trim();
 };
 
+// Extract topic from follow-up questions for preference learning
+const extractFollowUpTopic = (message: string): string | null => {
+  const lower = message.toLowerCase();
+  
+  // Topic keywords mapping
+  const topicPatterns: Record<string, RegExp> = {
+    'funding': /\b(funding|fund(?:ed)?|series [a-f]|investment|capital|valuation|raise)\b/i,
+    'hiring': /\b(hiring|recruit(?:ing)?|job(?:s)?|position(?:s)?|headcount|team size|employee(?:s)?)\b/i,
+    'tech_stack': /\b(tech(?:nology)?\s*stack|stack|technolog(?:y|ies)|platform(?:s)?|tool(?:s)?|infrastructure)\b/i,
+    'leadership': /\b(leader(?:ship)?|executive(?:s)?|c[et]o|founder(?:s)?|management|team)\b/i,
+    'acquisitions': /\b(acquisit(?:ion)?(?:s)?|m&a|merge(?:r)?(?:s)?|bought|acquired|purchase(?:d)?)\b/i,
+    'competitors': /\b(competitor(?:s)?|competitive|competition|rival(?:s)?|alternative(?:s)?)\b/i,
+    'customers': /\b(customer(?:s)?|client(?:s)?|case\s*stud(?:y|ies)|user(?:s)?|buyer(?:s)?)\b/i,
+    'revenue': /\b(revenue|profit(?:s)?|earning(?:s)?|arr|mrr|financial(?:s)?|income)\b/i,
+    'product': /\b(product(?:s)?|feature(?:s)?|offering(?:s)?|solution(?:s)?|service(?:s)?)\b/i,
+    'market': /\b(market|industry|sector|segment|space|landscape)\b/i,
+    'growth': /\b(growth|expand(?:ing)?|expansion|scale|scaling|traction)\b/i,
+    'news': /\b(news|press|announcement(?:s)?|launch(?:ed)?|recent|latest)\b/i
+  };
+  
+  // Find matching topics
+  for (const [topic, pattern] of Object.entries(topicPatterns)) {
+    if (pattern.test(lower)) {
+      return topic;
+    }
+  }
+  
+  return null;
+};
+
 const isBareNameQuery = (raw: string | null | undefined): boolean => {
   if (!raw) return false;
   const text = raw.trim();
@@ -2010,6 +2040,20 @@ useEffect(() => {
     const normalized = text.trim();
     const now = Date.now();
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
+    
+    // Detect follow-up questions for implicit preference learning
+    const isFollowUp = messages.length > 1 && lastUser && !options?.force;
+    if (isFollowUp && chatId) {
+      // Extract topic from follow-up question
+      const topic = extractFollowUpTopic(normalized);
+      if (topic) {
+        trackPreference({
+          type: 'follow_up_asked',
+          topic,
+          chatId
+        });
+      }
+    }
     if (!options?.force && (
       (lastUser && lastUser.content.trim().toLowerCase() === normalized.toLowerCase()) ||
       (lastSentRef.current && lastSentRef.current.text === normalized.toLowerCase() && now - lastSentRef.current.at < 4000)
@@ -2399,6 +2443,18 @@ useEffect(() => {
       setActionBarVisible(false);
     } finally {
       setLoading(false);
+      
+      // Track successful research completion for implicit preference learning
+      if (chatId && !streamingAbortRef.current?.signal.aborted) {
+        const depth = runModeOverride === 'quick' ? 'quick' : 'deep';
+        trackPreference({
+          type: 'research_completed',
+          depth,
+          agentType: 'company_research',
+          chatId
+        });
+      }
+      
       try { localStorage.removeItem('last_research_message'); } catch {}
     }
   };
@@ -2438,6 +2494,18 @@ useEffect(() => {
   const persistPreference = async (type: 'deep' | 'quick' | 'specific') => {
     setPreferredResearchType(type);
     try { localStorage.setItem('preferred_research_type', type); } catch {}
+    
+    // Track explicit preference confirmation (high confidence)
+    if (currentChatId) {
+      const depthValue = type === 'quick' ? 'shallow' : type === 'deep' ? 'deep' : 'standard';
+      trackPreference({
+        type: 'preference_confirmed',
+        key: 'coverage.depth',
+        value: depthValue,
+        chatId: currentChatId
+      });
+    }
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
