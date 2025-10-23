@@ -2732,7 +2732,9 @@ useEffect(() => {
       // Auto-detect short follow-up questions and force 'specific' when an active subject exists
       const shortFollowUp = /^(who|what|when|where|which|how|do|does|did|is|are|was|were)\b/i.test(userMessage.trim()) && userMessage.trim().length <= 120 && Boolean(activeSubject);
       const inferredDepth: 'deep' | 'quick' | 'specific' | undefined = (shortFollowUp || isFollowUp) ? 'specific' : undefined;
-      const depth = overrideDepth || inferredDepth || preferredResearchType || 'deep';
+      // CRITICAL: For follow-ups, inferredDepth MUST override user preferences to ensure fast, focused responses
+      // Priority: overrideDepth (explicit) > inferredDepth (follow-up detection) > preferredResearchType (user pref) > 'deep' (default)
+      const depth = overrideDepth || (inferredDepth === 'specific' ? 'specific' : (preferredResearchType || inferredDepth || 'deep'));
       setLastRunMode((depth as any) || 'auto');
       const cfg: any = { ...(options?.config || {}) };
       if (depth === 'deep') cfg.model = 'gpt-5-mini';
