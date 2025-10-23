@@ -2722,9 +2722,16 @@ useEffect(() => {
       } catch {}
       // Build config to influence model depth based on user preference/clarifier
       const overrideDepth = options?.overrideDepth;
+
+      // Detect if this is a follow-up question early (before depth calculation)
+      const isAskingAboutNewCompany = userMessage.toLowerCase().match(/\b(research|tell me about|what is|who is)\s+([\w\s]+?)(?:\?|$)/i);
+      const mentionsDifferentCompany = activeSubject && isAskingAboutNewCompany &&
+        !isAskingAboutNewCompany[2]?.toLowerCase().includes(activeSubject.toLowerCase());
+      const isFollowUp = messages.length > 1 && !mentionsDifferentCompany;
+
       // Auto-detect short follow-up questions and force 'specific' when an active subject exists
       const shortFollowUp = /^(who|what|when|where|which|how|do|does|did|is|are|was|were)\b/i.test(userMessage.trim()) && userMessage.trim().length <= 120 && Boolean(activeSubject);
-      const inferredDepth: 'deep' | 'quick' | 'specific' | undefined = shortFollowUp ? 'specific' : undefined;
+      const inferredDepth: 'deep' | 'quick' | 'specific' | undefined = (shortFollowUp || isFollowUp) ? 'specific' : undefined;
       const depth = overrideDepth || inferredDepth || preferredResearchType || 'deep';
       setLastRunMode((depth as any) || 'auto');
       const cfg: any = { ...(options?.config || {}) };
@@ -3201,11 +3208,14 @@ useEffect(() => {
         window.dispatchEvent(new CustomEvent('credits-updated'));
       }
       // Update active subject from the user message or assistant output
+      // Skip this for follow-up questions (depth === 'specific' with existing messages)
+      // to prevent "Microsoft" from being overwritten with "Their CEO"
+      const wasFollowUp = depth === 'specific' && messages.length > 1;
       try {
         const m = userMessage.match(/\bresearch\s+([\w\s.&-]{2,})/i);
-        if (m && m[1] && isLikelySubject(m[1])) {
+        if (m && m[1] && isLikelySubject(m[1]) && !wasFollowUp) {
           setActiveSubject(m[1].trim());
-        } else if (lastAssistantMessage?.content || mainContent) {
+        } else if ((lastAssistantMessage?.content || mainContent) && !wasFollowUp) {
           const text = (lastAssistantMessage?.content || mainContent || '').slice(0, 800);
           const patterns = [
             /researching\s+([A-Z][\w\s&.-]{2,}?)(?:[\s,:.-]|$)/i,
