@@ -411,6 +411,43 @@ interface ThinkingEvent {
   important?: string[];
 }
 
+// Mock reasoning steps for initial research (TASK mode)
+const MOCK_REASONING_TASK = [
+  'Analyzing company profile...',
+  'Studying ICP alignment...',
+  'Researching recent developments...',
+  'Identifying buying signals...',
+  'Evaluating strategic initiatives...',
+  'Conducting competitive analysis...',
+  'Assessing market positioning...',
+  'Reviewing leadership changes...',
+  'Analyzing financial indicators...',
+  'Examining technology stack...',
+  'Gathering intelligence from sources...',
+  'Synthesizing research findings...',
+];
+
+// Mock reasoning steps for follow-up questions (CONVERSATION mode)
+const MOCK_REASONING_CONVERSATION = [
+  'Processing your question...',
+  'Analyzing context...',
+  'Reviewing previous research...',
+  'Gathering additional insights...',
+  'Cross-referencing data points...',
+  'Evaluating implications...',
+  'Formulating response...',
+  'Synthesizing information...',
+];
+
+// Generate a randomized sequence of mock reasoning steps
+function generateMockReasoningSequence(isFollowUp: boolean): string[] {
+  const pool = isFollowUp ? MOCK_REASONING_CONVERSATION : MOCK_REASONING_TASK;
+  // Shuffle and take 5-8 steps
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  const count = Math.floor(Math.random() * 4) + 5; // 5-8 steps
+  return shuffled.slice(0, count);
+}
+
 export function ResearchChat() {
   const { user } = useAuth();
   const router = useRouter();
@@ -433,6 +470,10 @@ export function ResearchChat() {
   // acknowledgment messages are displayed via ThinkingIndicator events
   const [thinkingEvents, setThinkingEvents] = useState<ThinkingEvent[]>([]);
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  // Mock reasoning timer state
+  const [mockReasoningElapsed, setMockReasoningElapsed] = useState(0);
+  const mockReasoningTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mockReasoningStartTimeRef = useRef<number | null>(null);
   const [optimizeOpen, setOptimizeOpen] = useState(false);
   const [showInlineReasoning, setShowInlineReasoning] = useState<boolean>(() => {
     try { return localStorage.getItem('showInlineReasoning') !== '0'; } catch { return true; }
@@ -441,6 +482,75 @@ export function ResearchChat() {
     setShowInlineReasoning(v);
     try { localStorage.setItem('showInlineReasoning', v ? '1' : '0'); } catch {}
   };
+
+  // Start mock reasoning timer
+  const startMockReasoning = useCallback((isFollowUp: boolean) => {
+    // Clear any existing timer
+    if (mockReasoningTimerRef.current) {
+      clearInterval(mockReasoningTimerRef.current);
+    }
+
+    mockReasoningStartTimeRef.current = Date.now();
+    setMockReasoningElapsed(0);
+
+    const steps = generateMockReasoningSequence(isFollowUp);
+    let stepIndex = 0;
+    let nextStepAt = 3 + Math.floor(Math.random() * 5); // First step at 3-7 seconds
+
+    // Update timer every 100ms for smooth countdown
+    mockReasoningTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - mockReasoningStartTimeRef.current!) / 1000);
+      setMockReasoningElapsed(elapsed);
+
+      // Stop at 60 seconds
+      if (elapsed >= 60) {
+        if (mockReasoningTimerRef.current) {
+          clearInterval(mockReasoningTimerRef.current);
+          mockReasoningTimerRef.current = null;
+        }
+        return;
+      }
+
+      // Emit a new mock reasoning step at scheduled intervals
+      if (elapsed >= nextStepAt && stepIndex < steps.length) {
+        setThinkingEvents(prev => {
+          // Replace the last status event with the new one
+          const filtered = prev.filter(e => e.type !== 'status');
+          return [
+            ...filtered,
+            {
+              id: `mock-reasoning-${Date.now()}`,
+              type: 'status',
+              content: steps[stepIndex]
+            }
+          ];
+        });
+        stepIndex++;
+        // Schedule next step randomly 3-7 seconds later
+        nextStepAt = elapsed + 3 + Math.floor(Math.random() * 5);
+      }
+    }, 100);
+  }, []);
+
+  // Stop mock reasoning timer
+  const stopMockReasoning = useCallback(() => {
+    if (mockReasoningTimerRef.current) {
+      clearInterval(mockReasoningTimerRef.current);
+      mockReasoningTimerRef.current = null;
+    }
+    mockReasoningStartTimeRef.current = null;
+    setMockReasoningElapsed(0);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (mockReasoningTimerRef.current) {
+        clearInterval(mockReasoningTimerRef.current);
+      }
+    };
+  }, []);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoSentRef = useRef(false);
   const reasoningBufferRef = useRef<string>('');
@@ -2080,6 +2190,8 @@ useEffect(() => {
       type: 'status',
       content: 'Preparing research...'
     }]);
+    // Start mock reasoning timer with context-aware steps
+    startMockReasoning(!!isFollowUp);
     // Clear reasoning buffer when starting new request
     reasoningBufferRef.current = '';
     if (reasoningFlushTimerRef.current) {
@@ -2639,6 +2751,9 @@ useEffect(() => {
         return cloned;
       })();
 
+      // Detect if this is a follow-up question (has history and isn't forced new research)
+      const isFollowUpRequest = messages.length > 1;
+
       const requestPayload = JSON.stringify({
         messages: historyWithCurrent,
         stream: true,
@@ -2657,6 +2772,7 @@ useEffect(() => {
           } : {})
         },
         research_type: depth,
+        is_follow_up: isFollowUpRequest, // Pass follow-up flag to backend
         active_subject: activeSubject || null
       });
 
@@ -3002,6 +3118,8 @@ useEffect(() => {
                       markFirstDelta();
                       // Clear status messages once content starts
                       setThinkingEvents(prev => prev.filter(e => e.type !== 'status'));
+                      // Stop mock reasoning timer
+                      stopMockReasoning();
                       mainContent += filteredDelta;
                       updateStreaming();
                     }
@@ -4115,6 +4233,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                 const latestPlan = [...thinkingEvents].reverse().find(ev => ev.type === 'reasoning_progress');
                 const latestWebSearch = [...thinkingEvents].reverse().find(ev => ev.type === 'web_search');
                 const latestReasoning = [...thinkingEvents].reverse().find(ev => ev.type === 'reasoning');
+                const latestStatus = [...thinkingEvents].reverse().find(ev => ev.type === 'status');
                 const reasoningLine = (() => {
                   if (!latestReasoning || typeof latestReasoning.content !== 'string') return '';
                   const lines = latestReasoning.content.split(/\n+/).map(line => line.trim()).filter(Boolean);
@@ -4161,10 +4280,39 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                   );
                 };
 
-                if (!latestPlan && !reasoningLine && !latestWebSearch) return null;
+                // Show SOMETHING if we have any events - don't return null!
+                if (!latestPlan && !reasoningLine && !latestWebSearch && !latestStatus) return null;
 
                 return (
                   <div className="space-y-2">
+                    {/* CRITICAL: Show status/reasoning in unified format - seamless transition from mock to real */}
+                    {(latestStatus || (reasoningLine && !latestPlan && !latestWebSearch)) && (
+                      <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-900">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full flex-shrink-0"></div>
+                          <span className="font-medium truncate">
+                            {reasoningLine || latestStatus?.content || 'Loading...'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {mockReasoningElapsed > 0 && (
+                            <span className="text-blue-600 font-mono text-xs">
+                              {Math.floor(mockReasoningElapsed / 60)}:{String(mockReasoningElapsed % 60).padStart(2, '0')}
+                            </span>
+                          )}
+                          {reasoningLine && showInlineReasoning && (
+                            <button
+                              type="button"
+                              onClick={() => setReasoningOpen(true)}
+                              className="text-blue-700 hover:text-blue-900 text-xs whitespace-nowrap"
+                              aria-label="View full reasoning"
+                            >
+                              View all
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {latestPlan && (
                       <ThinkingIndicator
                         key={latestPlan.id}
@@ -4181,7 +4329,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                         sources={latestWebSearch.sources}
                       />
                     )}
-                    {renderReasoningSummary()}
+                    {/* Note: reasoning is now shown in the unified display above, not separately */}
                   </div>
                 );
               })()}

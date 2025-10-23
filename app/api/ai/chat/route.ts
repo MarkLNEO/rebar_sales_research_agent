@@ -12,8 +12,14 @@ export const maxDuration = 300;
 function getReasoningEffort(
   agentType: string,
   userMessage: string,
-  researchType?: 'quick' | 'deep' | 'specific'
-): 'low' | 'medium' | 'high' {
+  researchType?: 'quick' | 'deep' | 'specific',
+  isFollowUp?: boolean
+): 'low' | 'medium' | 'high' | undefined {
+  // For follow-ups: minimal or no reasoning - use existing context
+  if (isFollowUp || researchType === 'specific') {
+    return undefined; // Let OpenAI decide (usually fastest, minimal reasoning)
+  }
+
   // Deep mode with very complex queries: use medium reasoning (not high - too slow)
   if (researchType === 'deep' && userMessage.length > 500) {
     return 'medium';
@@ -71,6 +77,31 @@ Example: If asked "What's their tech stack?", list the stack immediately, then a
   return basePrompt;
 }
 
+// Helper: Create lightweight prompt for follow-up questions
+// Skip full research templates and just focus on conversational context
+function getLightweightFollowUpPrompt(fullContext: any): string {
+  const basePrompt = `You are a helpful research assistant answering a follow-up question about a company or topic from the previous research.
+
+## Your Role
+- Answer directly using context from the conversation history
+- Be concise and focused (200-400 words unless more detail is explicitly requested)
+- Don't repeat information already provided in previous messages
+- Reference previous research naturally
+
+## Custom Terminology (use these exact terms in your response)
+${fullContext.customTerminology || '(No custom terminology configured)'}
+
+## Instructions
+- **Direct answer first**: Lead with the specific information requested
+- **Context-aware**: Use information from the conversation history
+- **No boilerplate**: Skip standard brief structure unless it directly answers the question
+- **Conversational**: This is a follow-up, not a new research task
+
+Example: If asked "What's their tech stack?", list the stack immediately using information from previous research, then add brief context if relevant.`;
+
+  return basePrompt;
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   
@@ -83,6 +114,7 @@ export async function POST(req: NextRequest) {
       agentType = 'company_research',
       impersonate_user_id,
       research_type, // Extract mode selection from frontend
+      is_follow_up, // Flag indicating this is a follow-up question (not new research)
     } = body;
 
     // Authenticate and check credits in PARALLEL
@@ -98,10 +130,16 @@ export async function POST(req: NextRequest) {
     const fullContext = await loadFullUserContext(supabase, user.id, agentType);
 
     // Apply mode-specific instructions based on research_type
-    const modeAdjustedPrompt = addModeInstructions(fullContext.systemPrompt, research_type);
-    const instructions = fullContext.memoryBlock ? `${modeAdjustedPrompt}\n\n${fullContext.memoryBlock}` : modeAdjustedPrompt;
+    // For follow-ups: use lightweight conversational prompt (no full research templates)
+    let instructions: string;
+    if (is_follow_up || research_type === 'specific') {
+      instructions = getLightweightFollowUpPrompt(fullContext);
+    } else {
+      const modeAdjustedPrompt = addModeInstructions(fullContext.systemPrompt, research_type);
+      instructions = fullContext.memoryBlock ? `${modeAdjustedPrompt}\n\n${fullContext.memoryBlock}` : modeAdjustedPrompt;
+    }
 
-    console.log('[chat] Research mode:', research_type || 'default (deep)', '| Agent type:', agentType);
+    console.log('[chat] Research mode:', research_type || 'default (deep)', '| Agent type:', agentType, '| Follow-up:', is_follow_up ? 'YES' : 'NO');
 
     // Debug: Check if CLARIFY instructions are in the prompt
     const hasClarifyInstructions = instructions.includes('[CLARIFY]');
@@ -132,7 +170,10 @@ export async function POST(req: NextRequest) {
     // we need to include conversation history in the input
     let conversationContext = '';
     if (messages.length > 1) {
-      const recentMessages = messages.slice(-6); // Include last 3 exchanges (6 messages)
+      // For follow-ups: keep more history for context (5 exchanges)
+      // For new research: shorter history (3 exchanges)
+      const messageLimit = (is_follow_up || research_type === 'specific') ? 10 : 6;
+      const recentMessages = messages.slice(-messageLimit);
       const historyLines = recentMessages
         .filter((m: any) => m.role !== 'system')
         .map((m: any) => {
@@ -205,26 +246,30 @@ export async function POST(req: NextRequest) {
 
           console.log('[chat] Calling OpenAI Responses API...');
 
-          // Determine optimal reasoning effort for this request (considering research mode)
-          const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type);
-          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType, 'mode:', research_type);
+          // Determine optimal reasoning effort for this request (considering research mode and follow-up status)
+          const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type, is_follow_up);
+          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType, 'mode:', research_type, 'follow-up:', is_follow_up);
 
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
             instructions,
             input: enrichedInput,
-            
+
             // Explicitly request reasoning content in stream
             include: ['reasoning.encrypted_content'] as any,
-            
-            // Text formatting with verbosity control
-            text: { 
-              format: { type: 'text' },
-              verbosity: 'medium' as any // Use medium for balanced output (low/medium based on context)
+
+            // Text formatting
+            text: {
+              format: { type: 'text' }
             },
-            
+
             max_output_tokens: 12000, // Reduced from 16000 to prevent excessive token usage
-            tools: [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
+
+            // Disable web search for follow-ups - use existing context only
+            // Enable web search for new research tasks
+            tools: (is_follow_up || research_type === 'specific')
+              ? []
+              : [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
 
             // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
             reasoning: {
@@ -237,8 +282,9 @@ export async function POST(req: NextRequest) {
               user_id: user.id,
               chat_id: chatId,
               agent_type: agentType,
-              research_type: agentType === 'company_research' ? 'deep' : 'standard',
-              reasoning_effort: reasoningEffort // Track for analytics
+              research_type: research_type || 'deep', // Use actual research_type from frontend
+              is_follow_up: is_follow_up || false, // Track follow-up status
+              reasoning_effort: reasoningEffort || 'auto' // Track for analytics
             }
           });
 
