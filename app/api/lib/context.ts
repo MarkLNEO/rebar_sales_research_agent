@@ -408,36 +408,47 @@ IMPORTANT: Keep each follow-up concise (≤20 words). Do NOT include word count 
 
 ## Entity Disambiguation & Terminology Learning
 
-**CRITICAL: Detect and clarify unclear abbreviations, jargon, or ambiguous terms**
+**MANDATORY: You MUST output clarification blocks for ALL abbreviations and technical jargon**
 
-### When to Ask for Clarification
+### Clarification Block Format (REQUIRED)
 
-If the user mentions an abbreviation or term that could have multiple meanings:
+**YOU MUST output a [CLARIFY] block for EVERY abbreviation, acronym, or technical term in the user's query.**
 
-1. **Make your best guess** based on context
-2. **Include a clarification block** using this EXACT format:
-
-   [CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
-
-3. **Continue with your research** using your best guess
-
-**Common ambiguous terms:**
-- "CRM" → Could be Salesforce, HubSpot, or generic "Customer Relationship Management"
-- "m365" → Microsoft 365
-- "k8s" → Kubernetes
-- "AWS" → Amazon Web Services (usually clear, but could be "automated weather station" in some contexts)
-- Company-specific jargon that varies by industry
-
-**IMPORTANT:**
-- Only ask ONCE per term per user - the system persists confirmed mappings
-- Use lowercase for the term (e.g., "m365" not "M365")
-- Provide your best expansion guess
-- Add optional context if helpful
-- Do NOT ask about common, unambiguous terms (e.g., "AI", "CEO", "revenue")
-
-**Example in response:**
+Use this EXACT format at the START of your response:
 
 [CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
+
+Then continue with your normal research response.
+
+### Examples of terms that REQUIRE clarification:
+- **Abbreviations**: "m365" → Microsoft 365, "k8s" → Kubernetes, "crm" → Customer Relationship Management
+- **Acronyms**: "AWS" → Amazon Web Services, "GCP" → Google Cloud Platform
+- **Technical jargon**: industry-specific terms, product codenames
+- **Company-specific terms**: internal terminology that might vary by organization
+
+### How to output the clarification block:
+
+1. **Scan the user's query** for ANY abbreviation, acronym, or technical term
+2. **ALWAYS output a [CLARIFY] block** for each one at the BEGINNING of your response
+3. **Make your best guess** at what it means based on context
+4. **Continue with your research** using that interpretation
+
+**Format rules:**
+- Use lowercase for the term (e.g., "m365" not "M365")
+- Provide your best expansion guess
+- Add optional context if helpful (brief phrase)
+- Place ALL [CLARIFY] blocks at the very START of your response, before any other content
+
+**CRITICAL: You MUST include [CLARIFY] blocks even for "obvious" abbreviations like m365, k8s, CRM, etc.**
+
+The system only asks once per term per user and persists the mappings.
+
+**Example response:**
+
+[CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
+[CLARIFY]term=crm|expansion=Customer Relationship Management|context=sales software[/CLARIFY]
+
+## Summary & Recommendation
 
 I'm researching competitors to Microsoft 365 in the cloud productivity space...
 
