@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '../../../lib/auth';
+import { authenticateRequest } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/supabase/types';
 
@@ -76,14 +76,13 @@ export async function POST(request: NextRequest) {
       case 'signals': {
         const { data: signals } = await supabase
           .from('user_signal_preferences')
-          .select('signal_type, min_severity, lookback_days, enabled')
+          .select('*')
           .eq('user_id', user.id)
           .eq('enabled', true);
 
         if (signals && signals.length > 0) {
-          data = signals.map(s => ({
+          data = signals.map((s: any) => ({
             signal_type: s.signal_type,
-            min_severity: s.min_severity || 'any',
             lookback_days: s.lookback_days || 90,
           }));
           source = 'user_signal_preferences';
