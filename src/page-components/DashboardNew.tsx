@@ -945,6 +945,21 @@ export function DashboardNew() {
                 <DashboardGreeting
                   onSuggestionClick={(suggestion) => {
                     setInputValue(suggestion);
+                    // Immediately send the message
+                    void (async () => {
+                      if (!currentChatId) {
+                        const newChatId = await createNewChat({
+                          title: selectedTemplate?.label ?? selectedAgent.label,
+                          agentType: 'company_research',
+                          metadata: templateMetadata
+                            ? { ...templateMetadata, capability_plan: capabilityPlan }
+                            : {}
+                        });
+                        if (newChatId) await handleSendMessageWithChat(newChatId, suggestion);
+                        return;
+                      }
+                      await handleSendMessageWithChat(currentChatId, suggestion);
+                    })();
                   }}
                   onSignalClick={(company) => {
                     const next = `Research ${company} and show me what changed`;

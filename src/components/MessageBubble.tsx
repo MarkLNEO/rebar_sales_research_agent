@@ -162,6 +162,7 @@ export function MessageBubble({
   const { session } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [savingPreference, setSavingPreference] = useState(false);
+  const [savingTermMapping, setSavingTermMapping] = useState(false);
 
   // Parse preference capture blocks from AI response
   const { cleanContent, preferences } = useMemo(() => {
@@ -197,7 +198,41 @@ export function MessageBubble({
     return { cleanContent: cleaned, preferences: detectedPrefs };
   }, [content]);
 
-  const safeContent = cleanContent;
+  // Parse term mapping clarification blocks from AI response
+  const { finalContent, termMappings } = useMemo(() => {
+    const rawContent = cleanContent ?? '';
+    const clarifyRegex = /\[CLARIFY\](.+?)\[\/CLARIFY\]/g;
+    const detectedTerms: Array<{ term: string; expansion: string; context?: string }> = [];
+
+    let match;
+    while ((match = clarifyRegex.exec(rawContent)) !== null) {
+      const block = match[1];
+      const parts = block.split('|');
+      const parsed: Record<string, string> = {};
+
+      parts.forEach(part => {
+        const [k, v] = part.split('=');
+        if (k && v) {
+          parsed[k.trim()] = v.trim();
+        }
+      });
+
+      if (parsed.term && parsed.expansion) {
+        detectedTerms.push({
+          term: parsed.term,
+          expansion: parsed.expansion,
+          context: parsed.context,
+        });
+      }
+    }
+
+    // Strip clarification blocks from content
+    const cleaned = rawContent.replace(clarifyRegex, '').trim();
+
+    return { finalContent: cleaned, termMappings: detectedTerms };
+  }, [cleanContent]);
+
+  const safeContent = finalContent;
   const isCompanyResearch = agentType === 'company_research';
   const selectableMode = mode && mode !== 'auto' ? mode : null;
   const isSpecificMode = selectableMode === 'specific';
@@ -249,6 +284,54 @@ export function MessageBubble({
       setSavingPreference(false);
     }
   };
+
+  // Save term mapping to database
+  const handleSaveTermMapping = async (mapping: { term: string; expansion: string; context?: string }) => {
+    if (!session?.access_token) {
+      addToast({
+        type: 'error',
+        title: 'Authentication required',
+        description: 'Please sign in to save term mappings.',
+      });
+      return;
+    }
+
+    setSavingTermMapping(true);
+    try {
+      const response = await fetch('/api/term-mappings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          term: mapping.term,
+          expansion: mapping.expansion,
+          context: mapping.context,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save term mapping');
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Term saved',
+        description: `"${mapping.term}" will now expand to "${mapping.expansion}"`,
+      });
+    } catch (error) {
+      console.error('Failed to save term mapping:', error);
+      addToast({
+        type: 'error',
+        title: 'Failed to save term mapping',
+        description: 'Please try again.',
+      });
+    } finally {
+      setSavingTermMapping(false);
+    }
+  };
+
   const icpMeta = useMemo(() => {
     if (!isCompanyResearch || role !== 'assistant' || streaming) return null;
     // Do not show ICP scorecard for draft email content
@@ -780,6 +863,34 @@ export function MessageBubble({
               >
                 {savingPreference ? 'Saving...' : pref.label}
               </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {termMappings.length > 0 && role === 'assistant' && !streaming && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 shadow-sm">
+          <div className="text-xs font-semibold text-purple-900 uppercase tracking-wide mb-2">🔤 Confirm term meaning?</div>
+          <div className="space-y-2">
+            {termMappings.map((mapping, idx) => (
+              <div key={`${mapping.term}-${idx}`} className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-3 py-2">
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-purple-900">"{mapping.term}"</span>
+                  <span className="text-sm text-purple-700"> → </span>
+                  <span className="text-sm text-purple-800">{mapping.expansion}</span>
+                  {mapping.context && (
+                    <span className="text-xs text-purple-600 block mt-1">({mapping.context})</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSaveTermMapping(mapping)}
+                  disabled={savingTermMapping}
+                  className="ml-3 px-3 py-1 text-xs font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingTermMapping ? 'Saving...' : 'Confirm'}
+                </button>
+              </div>
             ))}
           </div>
         </div>

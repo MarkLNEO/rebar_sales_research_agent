@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, TrendingUp, AlertCircle, Plus, Upload, Flame, Clock, RefreshCw, Maximize2, X } from 'lucide-react';
-import { listTrackedAccounts, type TrackedAccount } from '../services/accountService';
+import { Building2, TrendingUp, AlertCircle, Plus, Upload, Flame, Clock, RefreshCw, Maximize2, X, Trash2 } from 'lucide-react';
+import { listTrackedAccounts, deleteTrackedAccount, type TrackedAccount } from '../services/accountService';
 import { useToast } from '../components/ToastProvider';
 import { BulkAccountUpload } from './BulkAccountUpload';
 
@@ -476,6 +476,7 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
           onClose={() => setShowModal(false)}
           onAccountClick={onAccountClick}
           onResearchAccount={onResearchAccount}
+          onAccountDeleted={() => { void loadAccounts(); }}
         />
       )}
     </div>
@@ -490,6 +491,7 @@ interface TrackedAccountsModalProps {
   onClose: () => void;
   onAccountClick: (account: TrackedAccount) => void;
   onResearchAccount?: (account: TrackedAccount) => void;
+  onAccountDeleted?: () => void;
 }
 
 function TrackedAccountsModal({
@@ -500,7 +502,33 @@ function TrackedAccountsModal({
   onClose,
   onAccountClick,
   onResearchAccount,
+  onAccountDeleted,
 }: TrackedAccountsModalProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { addToast } = useToast();
+
+  const handleDelete = async (account: TrackedAccount) => {
+    if (!confirm(`Remove "${account.company_name}" from tracked accounts?`)) return;
+
+    setDeletingId(account.id);
+    try {
+      await deleteTrackedAccount(account.id);
+      addToast({
+        type: 'success',
+        title: 'Account removed',
+        description: `${account.company_name} is no longer being tracked`,
+      });
+      if (onAccountDeleted) onAccountDeleted();
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        title: 'Failed to remove account',
+        description: error.message || 'Please try again',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-6 py-10">
       <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col">
@@ -508,6 +536,11 @@ function TrackedAccountsModal({
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Tracked accounts</h3>
             <p className="text-xs text-gray-600 mt-1">{stats?.total ?? 0} total • {stats?.with_signals ?? 0} with signals</p>
+            <p className="text-xs text-gray-500 mt-1.5">
+              <span className="font-semibold text-red-700">Hot</span>: Recent critical signals detected •
+              <span className="font-semibold text-orange-700"> Warm</span>: Showing momentum •
+              <span className="font-semibold text-gray-700"> Stale</span>: Not refreshed in 14+ days
+            </p>
           </div>
           <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-white" aria-label="Close tracked accounts">
             <X className="w-5 h-5" />
@@ -603,27 +636,45 @@ function TrackedAccountsModal({
                             <span>• Last research {account.last_researched_relative}</span>
                           )}
                         </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => { onAccountClick(account); onClose(); }}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
-                              hasSignals
-                                ? 'text-red-700 bg-red-50 border-red-100 hover:bg-red-100'
-                                : 'text-gray-600 bg-gray-100 border-gray-200 hover:bg-gray-200'
-                            }`}
-                          >
-                            {hasSignals ? 'Review signals' : 'Signals (0)'}
-                          </button>
-                          {onResearchAccount && (
+                        <div className="mt-4 flex flex-wrap gap-2 items-center justify-between">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => { onResearchAccount(account); onClose(); }}
-                              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full hover:bg-blue-100"
+                              onClick={() => { onAccountClick(account); onClose(); }}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
+                                hasSignals
+                                  ? 'text-red-700 bg-red-50 border-red-100 hover:bg-red-100'
+                                  : 'text-gray-600 bg-gray-100 border-gray-200 hover:bg-gray-200'
+                              }`}
                             >
-                              Open research
+                              {hasSignals ? 'Review signals' : 'Signals (0)'}
                             </button>
-                          )}
+                            {onResearchAccount && (
+                              <button
+                                type="button"
+                                onClick={() => { onResearchAccount(account); onClose(); }}
+                                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full hover:bg-blue-100"
+                              >
+                                Open research
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(account)}
+                            disabled={deletingId === account.id}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Remove from tracked accounts"
+                          >
+                            {deletingId === account.id ? (
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                              </svg>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>

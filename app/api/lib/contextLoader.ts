@@ -20,6 +20,7 @@ export interface FullUserContext {
   preferences: any[];
   openQuestions: any[];
   learnedPreferences: any;
+  termMappings: Array<{ term: string; expansion: string; context?: string }>;
   memoryBlock: string;
   systemPrompt: string;
 }
@@ -45,7 +46,7 @@ export async function loadFullUserContext(
   // Check cache first
   const cached = getCachedContext(userId);
   if (cached) {
-    // Rebuild system prompt with cached data (passing cached preferences to avoid duplicate DB call)
+    // Rebuild system prompt with cached data (passing cached preferences and term mappings to avoid duplicate DB call)
     const systemPrompt = await buildSystemPrompt(
       {
         userId: cached.userId,
@@ -55,7 +56,8 @@ export async function loadFullUserContext(
         disqualifiers: cached.disqualifiers,
       },
       agentType,
-      cached.learnedPreferences // Pass cached preferences
+      cached.learnedPreferences, // Pass cached preferences
+      cached.termMappings // Pass cached term mappings
     );
 
     return {
@@ -68,7 +70,7 @@ export async function loadFullUserContext(
   console.log(`[contextLoader] Cache miss for user ${userId}, loading from database...`);
   const loadStart = Date.now();
 
-  const [userContext, memoryBlock, learnedPreferences] = await Promise.all([
+  const [userContext, memoryBlock, learnedPreferences, termMappings] = await Promise.all([
     // Query 1: User context (profile, criteria, signals, etc.)
     fetchUserContext(supabase, userId),
 
@@ -86,10 +88,27 @@ export async function loadFullUserContext(
         return null;
       }
     })(),
+
+    // Query 4: Term mappings
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_term_mappings')
+          .select('term, expansion, context')
+          .eq('user_id', userId)
+          .order('use_count', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.warn('[contextLoader] Failed to load term mappings:', error);
+        return [];
+      }
+    })(),
   ]);
 
-  // Build system prompt with pre-loaded preferences (avoid duplicate DB call)
-  const systemPrompt = await buildSystemPrompt(userContext, agentType, learnedPreferences);
+  // Build system prompt with pre-loaded preferences and term mappings (avoid duplicate DB call)
+  const systemPrompt = await buildSystemPrompt(userContext, agentType, learnedPreferences, termMappings);
 
   const fullContext: FullUserContext = {
     userId,
@@ -102,6 +121,7 @@ export async function loadFullUserContext(
     preferences: userContext.preferences,
     openQuestions: userContext.openQuestions,
     learnedPreferences,
+    termMappings,
     memoryBlock,
     systemPrompt,
   };

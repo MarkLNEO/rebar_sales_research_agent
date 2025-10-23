@@ -128,10 +128,52 @@ export async function fetchUserContext(supabase: any, userId: string) {
   };
 }
 
+async function getUserTermMappings(userId: string): Promise<Array<{ term: string; expansion: string; context?: string }>> {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data, error } = await supabase
+      .from('user_term_mappings')
+      .select('term, expansion, context')
+      .eq('user_id', userId)
+      .order('use_count', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.warn('[getUserTermMappings] Failed to load term mappings:', error);
+    return [];
+  }
+}
+
+function buildTermMappingsSection(termMappings: Array<{ term: string; expansion: string; context?: string }>): string {
+  if (!termMappings || termMappings.length === 0) return '';
+
+  let section = '## User\'s Custom Terminology\n\n';
+  section += 'The user has confirmed these abbreviations and expansions. Always use the expansion when you see the term:\n\n';
+
+  termMappings.forEach(mapping => {
+    section += `- **${mapping.term}** = ${mapping.expansion}`;
+    if (mapping.context) {
+      section += ` (${mapping.context})`;
+    }
+    section += '\n';
+  });
+
+  section += '\n**IMPORTANT:** Do NOT ask for clarification about these terms again - they are confirmed.';
+
+  return section;
+}
+
 export async function buildSystemPrompt(
   context: any,
   agentType = 'company_research',
-  learnedPreferences?: any // Accept pre-loaded preferences to avoid duplicate DB calls
+  learnedPreferences?: any, // Accept pre-loaded preferences to avoid duplicate DB calls
+  termMappings?: Array<{ term: string; expansion: string; context?: string }> // Accept pre-loaded term mappings
 ): Promise<string> {
   const { userId, profile, customCriteria, signals, disqualifiers } = context;
 
@@ -155,6 +197,21 @@ export async function buildSystemPrompt(
       console.warn('[buildSystemPrompt] Failed to load preferences:', error);
     }
   }
+
+  // Use provided term mappings or fetch them (backward compatibility)
+  let termMappingsSection = '';
+  if (termMappings) {
+    // Use pre-loaded term mappings (cache hit path)
+    termMappingsSection = buildTermMappingsSection(termMappings);
+  } else if (userId) {
+    // Fetch term mappings (backward compatibility for direct calls)
+    try {
+      const mappings = await getUserTermMappings(userId);
+      termMappingsSection = buildTermMappingsSection(mappings);
+    } catch (error) {
+      console.warn('[buildSystemPrompt] Failed to load term mappings:', error);
+    }
+  }
   
   let prompt = `You are an elite B2B research intelligence agent focused on delivering high-impact insights for enterprise Account Executives.
 
@@ -162,7 +219,7 @@ Your core mission is to convert hours of manual research into seconds of actiona
 
 ---
 
-${learnedPrefsSection ? learnedPrefsSection + '\n\n---\n\n' : ''}
+${learnedPrefsSection ? learnedPrefsSection + '\n\n---\n\n' : ''}${termMappingsSection ? termMappingsSection + '\n\n---\n\n' : ''}
 
 ## Instruction Hierarchy
 
@@ -346,6 +403,43 @@ After synthesizing insights, offer three actionable next steps:
 3. Offer to adjust research, phrased naturally as a teammate
 
 IMPORTANT: Keep each follow-up concise (≤20 words). Do NOT include word count instructions in the user-facing output heading (e.g., don't write "Three quick follow-ups (20 words each)" - just write a clean heading like "Three quick follow-ups").
+
+---
+
+## Entity Disambiguation & Terminology Learning
+
+**CRITICAL: Detect and clarify unclear abbreviations, jargon, or ambiguous terms**
+
+### When to Ask for Clarification
+
+If the user mentions an abbreviation or term that could have multiple meanings:
+
+1. **Make your best guess** based on context
+2. **Include a clarification block** using this EXACT format:
+
+   [CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
+
+3. **Continue with your research** using your best guess
+
+**Common ambiguous terms:**
+- "CRM" → Could be Salesforce, HubSpot, or generic "Customer Relationship Management"
+- "m365" → Microsoft 365
+- "k8s" → Kubernetes
+- "AWS" → Amazon Web Services (usually clear, but could be "automated weather station" in some contexts)
+- Company-specific jargon that varies by industry
+
+**IMPORTANT:**
+- Only ask ONCE per term per user - the system persists confirmed mappings
+- Use lowercase for the term (e.g., "m365" not "M365")
+- Provide your best expansion guess
+- Add optional context if helpful
+- Do NOT ask about common, unambiguous terms (e.g., "AI", "CEO", "revenue")
+
+**Example in response:**
+
+[CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
+
+I'm researching competitors to Microsoft 365 in the cloud productivity space...
 
 ---
 
