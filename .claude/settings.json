@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "mcp__playwright__*"
+      "mcp__playwright__*",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_*",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_wait_for",
+      "mcp__supabase__get_logs",
+      "mcp__playwright__browser_console_messages",
+      "mcp__supabase__execute_sql"
     ],
     "deny": [],
     "ask": []

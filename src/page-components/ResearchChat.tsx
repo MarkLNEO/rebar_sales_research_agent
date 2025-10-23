@@ -4011,7 +4011,6 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                     onModeChange={isLastAssistant ? handleModeSwitch : undefined}
                     collapseEnabled={isLastAssistant && lastRunMode === 'quick'}
                     collapseThresholdWords={150}
-                    onTrackAccount={handleTrackAccount}
                     agentType="company_research"
                     summarizeReady={PREFS_SUMMARY_ENABLED && isLastAssistant && !thisIsDraft ? summarizeReady : false}
                     isSummarizing={PREFS_SUMMARY_ENABLED && isLastAssistant && !thisIsDraft ? summaryPending : false}
