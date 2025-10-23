@@ -875,7 +875,7 @@ export function MessageBubble({
             {termMappings.map((mapping, idx) => (
               <div key={`${mapping.term}-${idx}`} className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-3 py-2">
                 <div className="flex-1">
-                  <span className="text-sm font-semibold text-purple-900">"{mapping.term}"</span>
+                  <span className="text-sm font-semibold text-purple-900">&ldquo;{mapping.term}&rdquo;</span>
                   <span className="text-sm text-purple-700"> → </span>
                   <span className="text-sm text-purple-800">{mapping.expansion}</span>
                   {mapping.context && (
