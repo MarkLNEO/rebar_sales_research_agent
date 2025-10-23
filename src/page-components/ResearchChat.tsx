@@ -2287,15 +2287,22 @@ useEffect(() => {
     }
 
     // Only set active subject if value looks like a proper entity
+    // Exclude pronouns from being treated as company names (fixes "their CEO" bug)
+    const PRONOUNS = /^(their|its|the|this|that|his|her|your|our)$/i;
+    const firstWord = (detectedCompany || '').split(/\s+/)[0];
+    const detectedCompanyIsPronoun = firstWord && PRONOUNS.test(firstWord);
+
     const questionCandidateLooksLikeEntity =
       isWHQuestion &&
       isLikelySubject(detectedCompany) &&
       Boolean(detectedCompany) &&
+      !detectedCompanyIsPronoun &&
       !/^(the|a|an)\b/i.test((detectedCompany || '').toLowerCase()) &&
       (detectedCompany || '').split(/\s+/).length <= 4;
     const shouldAssignSubject =
       (looksLikeResearch || continuationTarget || questionCandidateLooksLikeEntity) &&
-      isLikelySubject(detectedCompany);
+      isLikelySubject(detectedCompany) &&
+      !detectedCompanyIsPronoun;
 
     if (shouldAssignSubject) {
       setActiveSubject(detectedCompany);
