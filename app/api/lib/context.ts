@@ -580,9 +580,16 @@ EXAMPLE:
 
 SEARCH INSTRUCTIONS:
 1. Use web search to find current executives with these titles
-2. Include their full names (not just titles or "VP of Sales")
-3. Add 1-2 sentence personalization angle for each
-4. If genuinely unable to find a specific title after searching, note "Title not publicly listed - suggest LinkedIn search" but this should be rare
+2. If exact title not found, search for CLOSEST REASONABLE APPROXIMATION:
+   - For CISO: Look for Chief Information Officer, Chief Information Security Officer, Chief Digital Officer, VP Information Security, VP Cybersecurity, etc.
+   - For CTO: Look for Chief Technology Officer, VP Engineering, VP Product & Technology, etc.
+   - For CFO: Look for Chief Financial Officer, VP Finance, Controller, etc.
+   - Use semantic similarity - "Chief Information Digital Officer" is a valid match for "CISO"
+3. Include their full names (not just titles or "VP of Sales")
+4. When using an approximation, note it clearly:
+   - **Dana Deasy** - Chief Information Digital Officer (closest match to CISO) - Recently appointed to lead digital transformation
+5. Add 1-2 sentence personalization angle for each person
+6. Only note "Title not publicly listed" if you cannot find ANY similar executive role after thorough searching
 ` : ''}
 
 **Ideal Customer Profile:**
