@@ -2758,7 +2758,12 @@ useEffect(() => {
       const markFirstDelta = () => {
         if (firstDeltaAt == null) {
           firstDeltaAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-          setThinkingEvents(prev => prev.filter(e => e.type !== 'acknowledgment' && e.type !== 'context_preview'));
+          // Clear initial loading indicators when first delta arrives
+          setThinkingEvents(prev => prev.filter(e =>
+            e.type !== 'acknowledgment' &&
+            e.type !== 'context_preview' &&
+            e.type !== 'status'
+          ));
           try {
             window.dispatchEvent(new CustomEvent('llm:first-delta', { detail: { page: 'research', ttfbMs: firstDeltaAt - startedAt } }));
             console.log('[LLM][research] first-delta', { ttfbMs: firstDeltaAt - startedAt });
