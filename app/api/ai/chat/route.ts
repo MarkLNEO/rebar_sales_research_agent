@@ -78,13 +78,13 @@ Example: If asked "What's their tech stack?", list the stack immediately, then a
 }
 
 // Helper: Create lightweight prompt for follow-up questions
-// Skip full research templates and just focus on conversational context
+// Keep web search enabled but use simpler output format
 function getLightweightFollowUpPrompt(fullContext: any): string {
   const basePrompt = `You are a helpful research assistant answering a follow-up question about a company or topic from the previous research.
 
 ## Your Role
-- Answer directly using context from the conversation history
-- Be concise and focused (200-400 words unless more detail is explicitly requested)
+- Answer directly and concisely (200-400 words unless more detail is explicitly requested)
+- Use conversation history as foundation, but search for fresh data if the question needs current info
 - Don't repeat information already provided in previous messages
 - Reference previous research naturally
 
@@ -93,11 +93,17 @@ ${fullContext.customTerminology || '(No custom terminology configured)'}
 
 ## Instructions
 - **Direct answer first**: Lead with the specific information requested
-- **Context-aware**: Use information from the conversation history
+- **Context-aware**: Build on information from the conversation history
+- **Fresh data when needed**: Use web search for current events, new developments, or factual lookups
 - **No boilerplate**: Skip standard brief structure unless it directly answers the question
-- **Conversational**: This is a follow-up, not a new research task
+- **Conversational**: This is a follow-up, not a full research brief
 
-Example: If asked "What's their tech stack?", list the stack immediately using information from previous research, then add brief context if relevant.`;
+Examples:
+- "What are their main competitors?" → Search for current competitive landscape, list concisely
+- "Tell me more about that CEO" → Use context from previous research, add any recent news
+- "What was their revenue?" → Pull from previous research if mentioned, otherwise search
+
+Quality bar: Accurate, current, and focused. Skip unnecessary elaboration.`;
 
   return basePrompt;
 }
@@ -170,18 +176,19 @@ export async function POST(req: NextRequest) {
     // we need to include conversation history in the input
     let conversationContext = '';
     if (messages.length > 1) {
-      // For follow-ups: keep more history for context (5 exchanges)
+      // For follow-ups: keep recent history for context (reduced to 5 for faster TTFB)
       // For new research: shorter history (3 exchanges)
-      const messageLimit = (is_follow_up || research_type === 'specific') ? 10 : 6;
+      const messageLimit = (is_follow_up || research_type === 'specific') ? 5 : 6;
       const recentMessages = messages.slice(-messageLimit);
       const historyLines = recentMessages
         .filter((m: any) => m.role !== 'system')
         .map((m: any) => {
           if (m.role === 'user') return `User: ${m.content}`;
           if (m.role === 'assistant') {
-            // Summarize assistant responses to save tokens
-            const content = m.content.substring(0, 300);
-            return `Assistant: ${content}${m.content.length > 300 ? '...' : ''}`;
+            // Summarize assistant responses to save tokens (100 chars for follow-ups)
+            const summaryLength = (is_follow_up || research_type === 'specific') ? 100 : 300;
+            const content = m.content.substring(0, summaryLength);
+            return `Assistant: ${content}${m.content.length > summaryLength ? '...' : ''}`;
           }
           return '';
         })
@@ -248,7 +255,9 @@ export async function POST(req: NextRequest) {
 
           // Determine optimal reasoning effort for this request (considering research mode and follow-up status)
           const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type, is_follow_up);
-          const toolsArray = (is_follow_up || research_type === 'specific') ? [] : [{ type: 'web_search' as any }];
+
+          // ALWAYS enable web search - follow-ups often need fresh data (competitors, news, etc)
+          const toolsArray = [{ type: 'web_search' as any }];
 
           console.log('[chat] ============ CONVERSATION MODE DEBUG ============');
           console.log('[chat] is_follow_up:', is_follow_up);
@@ -276,8 +285,7 @@ export async function POST(req: NextRequest) {
 
             max_output_tokens: 12000, // Reduced from 16000 to prevent excessive token usage
 
-            // Disable web search for follow-ups - use existing context only
-            // Enable web search for new research tasks
+            // Always enable web search - even follow-ups often need fresh data
             tools: toolsArray,
 
             // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
