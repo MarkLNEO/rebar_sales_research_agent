@@ -507,6 +507,11 @@ If your output has plain text headings without ##, it's WRONG. Every section mus
 - **"${watchlistTerm}"**
 - These terms demonstrate attentiveness to user language
 
+**Target Decision Maker Titles:** ${profile.target_titles && Array.isArray(profile.target_titles) && profile.target_titles.length > 0 ? profile.target_titles.map((t: any) => t.title || t).filter(Boolean).join(', ') : 'Not specified'}
+${profile.target_titles && Array.isArray(profile.target_titles) && profile.target_titles.length > 0 ? `
+**CRITICAL**: These are the EXACT titles the user sells into. You MUST include a "Decision Makers" section in every company research output showing contacts for these titles. If you cannot find public information for a title, explicitly state that and suggest next steps.
+` : ''}
+
 **Ideal Customer Profile:**
 ${profile.ideal_customer_profile || 'Not specified'}
 
@@ -548,7 +553,7 @@ Use this ICP to score companies (0-100%) and focus research on fit indicators.
   if (signals?.length > 0) {
     const signalTerm = profile?.signal_terminology || 'Buying Signals';
     const watchlistTerm = profile?.watchlist_label || 'Watchlist';
-    
+
     prompt += `\n<buying_signals>
 ## ${signalTerm.toUpperCase()}
 
@@ -561,18 +566,23 @@ These time-sensitive events create urgency (actively monitor):
    - Search specifically for this signal
 `;
     });
-    
+
     prompt += `\n**Scoring rules**:
 - Critical signal detected (< 30 days): Hot lead, reach out TODAY
-- Important signal detected (< 60 days): Warm lead, reach out this WEEK  
+- Important signal detected (< 60 days): Warm lead, reach out this WEEK
 - Multiple signals: Compound urgency
 - No signals found: Monitor, note in Risks & Gaps
 
-Include a **${watchlistTerm}** section in EVERY report showing signal status:
-✅ Detected: [Description + date + source]
-⏸️ No recent activity (last ${signals[0]?.lookback_days || 90} days)
+**CRITICAL OUTPUT REQUIREMENT**:
+Include a **${watchlistTerm}** or **${signalTerm}** section in EVERY report with findings broken down BY SIGNAL TYPE:
 
-This shows the user you're actively monitoring their priorities.
+## ${signalTerm}
+${signals.map((s: any) => `**${s.signal_type}**:\n- [Your findings here with date + source, or "No recent activity"]`).join('\n\n')}
+
+This breakdown structure is MANDATORY - the user needs to see each signal type they configured, not a generic list.
+If no activity found for a signal: "**${signals[0]?.signal_type}**: No recent activity (last ${signals[0]?.lookback_days || 90} days)"
+
+ALWAYS use the exact signal type names the user configured.
 </buying_signals>`;
   }
 

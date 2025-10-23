@@ -2074,7 +2074,12 @@ useEffect(() => {
     lastSentRef.current = { text: normalized.toLowerCase(), at: now };
     setLoading(true);
     setStreamingMessage('');
-    setThinkingEvents([]);
+    // Show immediate loading indicator
+    setThinkingEvents([{
+      id: `loading-${Date.now()}`,
+      type: 'status',
+      content: 'Preparing research...'
+    }]);
     // Clear reasoning buffer when starting new request
     reasoningBufferRef.current = '';
     if (reasoningFlushTimerRef.current) {

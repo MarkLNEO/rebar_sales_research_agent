@@ -126,8 +126,35 @@ export async function POST(req: NextRequest) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    
+
+    // Build conversation history context for OpenAI Responses API
+    // Since Responses API only takes single 'input' string (not messages array),
+    // we need to include conversation history in the input
+    let conversationContext = '';
+    if (messages.length > 1) {
+      const recentMessages = messages.slice(-6); // Include last 3 exchanges (6 messages)
+      const historyLines = recentMessages
+        .filter((m: any) => m.role !== 'system')
+        .map((m: any) => {
+          if (m.role === 'user') return `User: ${m.content}`;
+          if (m.role === 'assistant') {
+            // Summarize assistant responses to save tokens
+            const content = m.content.substring(0, 300);
+            return `Assistant: ${content}${m.content.length > 300 ? '...' : ''}`;
+          }
+          return '';
+        })
+        .filter(Boolean);
+
+      if (historyLines.length > 0) {
+        conversationContext = `\n\n## Recent Conversation History\n${historyLines.join('\n\n')}\n\n## Current Question\n`;
+      }
+    }
+
+    const enrichedInput = conversationContext + lastUserMessage.content;
+
     console.log('[chat] Starting stream for user:', user.id, 'chatId:', chatId, 'agentType:', agentType);
+    console.log('[chat] Conversation history included:', messages.length > 1 ? 'Yes' : 'No');
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -185,7 +212,7 @@ export async function POST(req: NextRequest) {
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
             instructions,
-            input: lastUserMessage.content,
+            input: enrichedInput,
             
             // Explicitly request reasoning content in stream
             include: ['reasoning.encrypted_content'] as any,
