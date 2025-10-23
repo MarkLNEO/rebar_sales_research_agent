@@ -2725,16 +2725,41 @@ useEffect(() => {
 
       // Detect if this is a follow-up question early (before depth calculation)
       const isAskingAboutNewCompany = userMessage.toLowerCase().match(/\b(research|tell me about|what is|who is)\s+([\w\s]+?)(?:\?|$)/i);
+
+      // Exclude pronouns/articles from being treated as company names (fixes "their CEO" bug)
+      const PRONOUNS = /^(their|its|the|this|that|his|her|your|our)$/i;
+      const capturedPhrase = isAskingAboutNewCompany?.[2]?.trim();
+      const isPronoun = capturedPhrase && PRONOUNS.test(capturedPhrase.split(/\s+/)[0]);
+
       const mentionsDifferentCompany = activeSubject && isAskingAboutNewCompany &&
+        !isPronoun &&
         !isAskingAboutNewCompany[2]?.toLowerCase().includes(activeSubject.toLowerCase());
       const isFollowUp = messages.length > 1 && !mentionsDifferentCompany;
 
       // Auto-detect short follow-up questions and force 'specific' when an active subject exists
       const shortFollowUp = /^(who|what|when|where|which|how|do|does|did|is|are|was|were)\b/i.test(userMessage.trim()) && userMessage.trim().length <= 120 && Boolean(activeSubject);
       const inferredDepth: 'deep' | 'quick' | 'specific' | undefined = (shortFollowUp || isFollowUp) ? 'specific' : undefined;
+
+      // DEBUG: Log follow-up detection logic
+      console.log('[FOLLOW-UP DEBUG]', {
+        userMessage,
+        activeSubject,
+        messages_length: messages.length,
+        isAskingAboutNewCompany: isAskingAboutNewCompany ? { matched: isAskingAboutNewCompany[0], captured: isAskingAboutNewCompany[2] } : null,
+        isPronoun,
+        mentionsDifferentCompany,
+        isFollowUp,
+        shortFollowUp,
+        inferredDepth,
+        overrideDepth,
+        preferredResearchType
+      });
+
       // CRITICAL: For follow-ups, inferredDepth MUST override user preferences to ensure fast, focused responses
       // Priority: overrideDepth (explicit) > inferredDepth (follow-up detection) > preferredResearchType (user pref) > 'deep' (default)
       const depth = overrideDepth || (inferredDepth === 'specific' ? 'specific' : (preferredResearchType || inferredDepth || 'deep'));
+
+      console.log('[FOLLOW-UP DEBUG] Final depth:', depth);
       setLastRunMode((depth as any) || 'auto');
       const cfg: any = { ...(options?.config || {}) };
       if (depth === 'deep') cfg.model = 'gpt-5-mini';
