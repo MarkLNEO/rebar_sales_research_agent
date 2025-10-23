@@ -103,6 +103,14 @@ export async function POST(req: NextRequest) {
 
     console.log('[chat] Research mode:', research_type || 'default (deep)', '| Agent type:', agentType);
 
+    // Debug: Check if CLARIFY instructions are in the prompt
+    const hasClarifyInstructions = instructions.includes('[CLARIFY]');
+    console.log('[chat] System prompt includes [CLARIFY] instructions:', hasClarifyInstructions);
+    if (hasClarifyInstructions) {
+      const clarifySection = instructions.match(/## Entity Disambiguation[\s\S]{0,500}/)?.[0];
+      console.log('[chat] CLARIFY section preview:', clarifySection?.substring(0, 200));
+    }
+
     // Initialize OpenAI
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY!
