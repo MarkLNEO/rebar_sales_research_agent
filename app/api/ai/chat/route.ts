@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
               chat_id: chatId,
               agent_type: agentType,
               research_type: research_type || 'deep', // Use actual research_type from frontend
-              is_follow_up: is_follow_up || false, // Track follow-up status
+              is_follow_up: is_follow_up ? 'true' : 'false', // Track follow-up status (must be string)
               reasoning_effort: reasoningEffort || 'auto' // Track for analytics
             }
           });
