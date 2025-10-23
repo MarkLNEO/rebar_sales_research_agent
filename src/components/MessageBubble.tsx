@@ -613,11 +613,14 @@ export function MessageBubble({
   ) : null;
 
   const isDraftEmail = /^\s*##\s*Draft Email\b/i.test(safeContent);
+  // Hide "Assumed" badge for follow-up questions (specific mode)
+  // Follow-ups should maintain context, not show an assumption badge
+  const showAssumedBadge = assumed && !isSpecificMode;
   return (
     <div className="space-y-3" data-testid="message-assistant">
-      {(assumed || onModeChange || selectableMode) && (
+      {(showAssumedBadge || onModeChange || selectableMode) && (
         <div className="space-y-2">
-          {assumed && (
+          {showAssumedBadge && (
             <div className="w-full flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50/90 px-3 py-2 shadow-sm">
               <div className="flex items-center gap-2 text-amber-900">
                 <Target className="w-4 h-4" />

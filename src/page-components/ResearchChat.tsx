@@ -2676,11 +2676,14 @@ useEffect(() => {
             const json = await resp.json();
             const extractedSubject = (json?.subject || '').trim();
             const intent = String(json?.intent || '').toLowerCase();
-            if (extractedSubject && isLikelySubject(extractedSubject)) {
+            const isFollowUpIntent = intent === 'follow_up' || intent === 'compare' || intent === 'summarize';
+            // Only update activeSubject if this is NOT a follow-up question
+            // For follow-ups, maintain the existing subject to avoid overwriting "Salesforce" with "Their CEO"
+            if (extractedSubject && isLikelySubject(extractedSubject) && !isFollowUpIntent) {
               setActiveSubject(extractedSubject);
             }
             // Use Specific mode for follow-up style intents
-            if (!options?.overrideDepth && (intent === 'follow_up' || intent === 'compare' || intent === 'summarize')) {
+            if (!options?.overrideDepth && isFollowUpIntent) {
               // tag for later depth selection
               (options as any) = { ...(options || {}), overrideDepth: 'specific' };
             }
