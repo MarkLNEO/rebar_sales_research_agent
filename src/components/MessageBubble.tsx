@@ -201,7 +201,7 @@ export function MessageBubble({
   // Parse term mapping clarification blocks from AI response
   const { finalContent, termMappings } = useMemo(() => {
     const rawContent = cleanContent ?? '';
-    const clarifyRegex = /\[CLARIFY\](.+?)\[\/CLARIFY\]/g;
+    const clarifyRegex = /\[CLARIFY\]([^\]]+?)\[\/CLARIFY\]/g;
     const detectedTerms: Array<{ term: string; expansion: string; context?: string }> = [];
 
     let match;
