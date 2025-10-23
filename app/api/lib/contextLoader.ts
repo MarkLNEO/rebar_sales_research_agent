@@ -108,7 +108,16 @@ export async function loadFullUserContext(
   ]);
 
   // Build system prompt with pre-loaded preferences and term mappings (avoid duplicate DB call)
+  console.log(`[contextLoader] Building system prompt with ${termMappings.length} term mappings`);
   const systemPrompt = await buildSystemPrompt(userContext, agentType, learnedPreferences, termMappings);
+
+  // Debug: Check if CLARIFY instructions are in the built prompt
+  const hasClarify = systemPrompt.includes('[CLARIFY]');
+  console.log(`[contextLoader] System prompt includes [CLARIFY]: ${hasClarify}`);
+  if (hasClarify) {
+    const preview = systemPrompt.match(/## Entity Disambiguation[\s\S]{0,300}/)?.[0];
+    console.log(`[contextLoader] CLARIFY section: ${preview}`);
+  }
 
   const fullContext: FullUserContext = {
     userId,
