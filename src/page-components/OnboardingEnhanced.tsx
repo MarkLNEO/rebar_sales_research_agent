@@ -621,34 +621,52 @@ export function OnboardingEnhanced() {
     }
   };
 
-const parseCriteriaFromInput = (input: string): string[] => {
-    // Check if input contains numbered patterns like "1. text 2. text" or "1. text\n2. text"
-    const hasNumbering = /\d+\.\s+/.test(input);
+/**
+ * Parse user-provided criteria text into structured array using LLM
+ * Handles complex cases like:
+ * - Numbers with commas: "1,000 employees" → ONE criterion
+ * - Parenthetical examples: "cloud infrastructure (AWS, Azure, GCP)" → ONE criterion
+ * - Natural language grouping
+ */
+const parseCriteriaFromInput = async (input: string): Promise<string[]> => {
+    try {
+      // Call LLM-based parsing API (gpt-5-nano)
+      const response = await fetch('/api/ai/parse-criteria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }),
+      });
 
-    if (hasNumbering) {
-      // Split by numbered pattern (e.g., "1. ", "2. ", etc.)
-      const parts = input.split(/\d+\.\s+/).map(part => part.trim()).filter(part => part.length > 0);
+      if (!response.ok) {
+        console.error('[parseCriteria] API error:', response.status);
+        throw new Error('API request failed');
+      }
 
-      // The first element might be empty if input starts with "1. "
-      return parts.filter(part => part.length > 3);
+      const data = await response.json();
+
+      if (data.criteria && Array.isArray(data.criteria)) {
+        return data.criteria.filter((c: string) => c.trim().length > 0);
+      }
+
+      throw new Error('Invalid response format');
+    } catch (error) {
+      console.error('[parseCriteria] Error calling parse-criteria API:', error);
+
+      // Fallback: Simple parsing if API fails
+      // This maintains basic functionality even if LLM is unavailable
+      const hasNumbering = /\d+\.\s+/.test(input);
+      if (hasNumbering) {
+        const parts = input.split(/\d+\.\s+/).map(part => part.trim()).filter(part => part.length > 3);
+        return parts;
+      }
+
+      const lines = input
+        .split(/\n|;/)
+        .map(line => line.trim())
+        .filter(line => line.length > 3);
+
+      return lines.length > 0 ? lines : [input.trim()];
     }
-
-    // If comma-separated values are provided, treat each as a separate criterion
-    if (input.includes(',')) {
-      const items = input
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 1);
-      if (items.length > 1) return items;
-    }
-
-    // Fallback: split by newlines or semicolons
-    const lines = input
-      .split(/\n|;/)
-      .map(line => line.trim())
-      .filter(line => line.length > 3);
-
-    return lines;
 };
 
 const inferFieldTypeFromCriterion = (criterion: string): 'text' | 'number' | 'boolean' | 'list' => {
@@ -752,7 +770,7 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
       return;
     }
 
-    const newCriteria = parseCriteriaFromInput(input);
+    const newCriteria = await parseCriteriaFromInput(input);
 
     if (newCriteria.length === 0) {
       await addAgentMessage(
