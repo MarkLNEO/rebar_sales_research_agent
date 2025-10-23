@@ -2740,26 +2740,26 @@ useEffect(() => {
       const shortFollowUp = /^(who|what|when|where|which|how|do|does|did|is|are|was|were)\b/i.test(userMessage.trim()) && userMessage.trim().length <= 120 && Boolean(activeSubject);
       const inferredDepth: 'deep' | 'quick' | 'specific' | undefined = (shortFollowUp || isFollowUp) ? 'specific' : undefined;
 
-      // DEBUG: Log follow-up detection logic
-      console.log('[FOLLOW-UP DEBUG]', {
-        userMessage,
-        activeSubject,
-        messages_length: messages.length,
-        isAskingAboutNewCompany: isAskingAboutNewCompany ? { matched: isAskingAboutNewCompany[0], captured: isAskingAboutNewCompany[2] } : null,
-        isPronoun,
-        mentionsDifferentCompany,
-        isFollowUp,
-        shortFollowUp,
-        inferredDepth,
-        overrideDepth,
-        preferredResearchType
-      });
+      // DEBUG: Log follow-up detection logic - SEPARATE LINES TO AVOID TRUNCATION
+      console.log('[FOLLOW-UP] === DETECTION START ===');
+      console.log('[FOLLOW-UP] userMessage:', userMessage);
+      console.log('[FOLLOW-UP] activeSubject:', activeSubject);
+      console.log('[FOLLOW-UP] messages.length:', messages.length);
+      console.log('[FOLLOW-UP] isAskingAboutNewCompany:', isAskingAboutNewCompany);
+      console.log('[FOLLOW-UP] capturedPhrase:', capturedPhrase);
+      console.log('[FOLLOW-UP] isPronoun:', isPronoun);
+      console.log('[FOLLOW-UP] mentionsDifferentCompany:', mentionsDifferentCompany);
+      console.log('[FOLLOW-UP] isFollowUp:', isFollowUp);
+      console.log('[FOLLOW-UP] shortFollowUp:', shortFollowUp);
+      console.log('[FOLLOW-UP] inferredDepth:', inferredDepth);
+      console.log('[FOLLOW-UP] overrideDepth:', overrideDepth);
+      console.log('[FOLLOW-UP] preferredResearchType:', preferredResearchType);
 
       // CRITICAL: For follow-ups, inferredDepth MUST override user preferences to ensure fast, focused responses
       // Priority: overrideDepth (explicit) > inferredDepth (follow-up detection) > preferredResearchType (user pref) > 'deep' (default)
       const depth = overrideDepth || (inferredDepth === 'specific' ? 'specific' : (preferredResearchType || inferredDepth || 'deep'));
 
-      console.log('[FOLLOW-UP DEBUG] Final depth:', depth);
+      console.log('[FOLLOW-UP] === FINAL DEPTH:', depth, '===');
       setLastRunMode((depth as any) || 'auto');
       const cfg: any = { ...(options?.config || {}) };
       if (depth === 'deep') cfg.model = 'gpt-5-mini';
