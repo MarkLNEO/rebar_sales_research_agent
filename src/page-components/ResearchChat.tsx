@@ -2756,8 +2756,8 @@ useEffect(() => {
       console.log('[FOLLOW-UP] preferredResearchType:', preferredResearchType);
 
       // CRITICAL: For follow-ups, inferredDepth MUST override user preferences to ensure fast, focused responses
-      // Priority: overrideDepth (explicit) > inferredDepth (follow-up detection) > preferredResearchType (user pref) > 'deep' (default)
-      const depth = overrideDepth || (inferredDepth === 'specific' ? 'specific' : (preferredResearchType || inferredDepth || 'deep'));
+      // Priority: inferredDepth (follow-up detection) > overrideDepth (explicit) > preferredResearchType (user pref) > 'deep' (default)
+      const depth = (inferredDepth === 'specific' ? 'specific' : (overrideDepth || preferredResearchType || inferredDepth || 'deep'));
 
       console.log('[FOLLOW-UP] === FINAL DEPTH:', depth, '===');
       setLastRunMode((depth as any) || 'auto');
