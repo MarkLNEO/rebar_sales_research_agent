@@ -2761,13 +2761,8 @@ useEffect(() => {
         return cloned;
       })();
 
-      // Detect if this is a follow-up question (has history and same subject)
-      // NOT a follow-up if: no history, or asking about a different company
-      const isAskingAboutNewCompany = userMessage.toLowerCase().match(/\b(research|tell me about|what is|who is)\s+([\w\s]+?)(?:\?|$)/i);
-      const mentionsDifferentCompany = activeSubject && isAskingAboutNewCompany &&
-        !isAskingAboutNewCompany[2]?.toLowerCase().includes(activeSubject.toLowerCase());
-
-      const isFollowUpRequest = messages.length > 1 && !mentionsDifferentCompany;
+      // Follow-up detection already done above (lines 2726-2730) to calculate depth early
+      const isFollowUpRequest = isFollowUp;
 
       const requestPayload = JSON.stringify({
         messages: historyWithCurrent,
