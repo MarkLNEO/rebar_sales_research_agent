@@ -566,7 +566,23 @@ If your output has plain text headings without ##, it's WRONG. Every section mus
 
 **Target Decision Maker Titles:** ${profile.target_titles && Array.isArray(profile.target_titles) && profile.target_titles.length > 0 ? profile.target_titles.map((t: any) => t.title || t).filter(Boolean).join(', ') : 'Not specified'}
 ${profile.target_titles && Array.isArray(profile.target_titles) && profile.target_titles.length > 0 ? `
-**CRITICAL**: These are the EXACT titles the user sells into. You MUST include a "Decision Makers" section in every company research output showing contacts for these titles. If you cannot find public information for a title, explicitly state that and suggest next steps.
+**CRITICAL - DECISION MAKERS REQUIREMENT**:
+You MUST include a "Decision Makers" or "Hot Prospects" section in EVERY company research output with ACTUAL NAMES AND TITLES for these roles: ${profile.target_titles.map((t: any) => t.title || t).filter(Boolean).join(', ')}.
+
+FORMAT REQUIRED:
+## Decision Makers
+- **[Full Name]** - [Exact Title] - [Brief personalization angle based on their background/recent activity]
+
+EXAMPLE:
+## Decision Makers
+- **Eugene Hall** - CEO - Has spoken publicly about AI transformation priorities
+- **Sarah Chen** - VP Sales - Recently hired (joined 6 months ago), opportunity to introduce new tools
+
+SEARCH INSTRUCTIONS:
+1. Use web search to find current executives with these titles
+2. Include their full names (not just titles or "VP of Sales")
+3. Add 1-2 sentence personalization angle for each
+4. If genuinely unable to find a specific title after searching, note "Title not publicly listed - suggest LinkedIn search" but this should be rare
 ` : ''}
 
 **Ideal Customer Profile:**
@@ -630,16 +646,26 @@ These time-sensitive events create urgency (actively monitor):
 - Multiple signals: Compound urgency
 - No signals found: Monitor, note in Risks & Gaps
 
-**CRITICAL OUTPUT REQUIREMENT**:
-Include a **${watchlistTerm}** or **${signalTerm}** section in EVERY report with findings broken down BY SIGNAL TYPE:
+**CRITICAL OUTPUT REQUIREMENT - ${signalTerm.toUpperCase()} FORMAT**:
+You MUST include a "${signalTerm}" section in EVERY report showing findings for each configured signal type.
 
+REQUIRED FORMAT (use exact signal type names):
 ## ${signalTerm}
-${signals.map((s: any) => `**${s.signal_type}**:\n- [Your findings here with date + source, or "No recent activity"]`).join('\n\n')}
+${signals.map((s: any) => `- **${s.signal_type}** - [Your specific findings with brief context, dates, and impact]`).join('\n')}
 
-This breakdown structure is MANDATORY - the user needs to see each signal type they configured, not a generic list.
-If no activity found for a signal: "**${signals[0]?.signal_type}**: No recent activity (last ${signals[0]?.lookback_days || 90} days)"
+CORRECT EXAMPLES:
+- **Data breach** - Recent cybersecurity incident reported in Q3 2025, CEO mentioned need for security overhaul in earnings call
+- **Leadership change** - New CTO hired 2 months ago (former AWS VP), likely evaluating new vendors
+- **Funding round** - Series C ($50M) announced Oct 2025, expansion into enterprise segment
 
-ALWAYS use the exact signal type names the user configured.
+WRONG (too vague):
+- **Data breach**: Found some activity
+- **Leadership change**: See recent news
+
+If no activity found for a signal type, still list it:
+- **[Signal Type]** - No recent activity detected (last ${signals[0]?.lookback_days || 90} days)
+
+USE THE EXACT SIGNAL TYPE NAMES configured by the user. DO NOT rename or summarize them.
 </buying_signals>`;
   }
 
