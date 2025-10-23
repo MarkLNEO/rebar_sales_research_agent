@@ -66,9 +66,17 @@ Be direct. Be brief. Be high-impact.`;
 }
 
 function buildLearnedPreferencesSection(prefs: ResolvedPrefs): string {
+  // Check if any focus.* fields are set (not just focus.areas)
+  const hasFocusPrefs = prefs.focus && typeof prefs.focus === 'object' &&
+    Object.keys(prefs.focus).some(key =>
+      key !== 'confidence' &&
+      prefs.focus[key] !== null &&
+      prefs.focus[key] !== undefined
+    );
+
   const hasPreferences = prefs && (
     prefs.coverage?.depth ||
-    prefs.focus?.areas?.length ||
+    hasFocusPrefs ||
     prefs.summary?.brevity ||
     prefs.tone
   );
@@ -88,12 +96,35 @@ function buildLearnedPreferencesSection(prefs: ResolvedPrefs): string {
          'Low confidence - ask for clarification'}\n\n`;
   }
 
-  if (prefs.focus?.areas && Array.isArray(prefs.focus.areas) && prefs.focus.areas.length > 0) {
-    section += `### Primary Focus Areas:\n`;
-    prefs.focus.areas.forEach((area: string) => {
-      section += `- **${area}**: Always include detailed coverage\n`;
-    });
-    section += '\n';
+  // Handle both legacy focus.areas array and individual focus.* fields
+  if (prefs.focus && typeof prefs.focus === 'object') {
+    const focusKeys = Object.keys(prefs.focus).filter(key =>
+      key !== 'confidence' &&
+      prefs.focus[key] !== null &&
+      prefs.focus[key] !== undefined
+    );
+
+    if (focusKeys.length > 0) {
+      section += `### Primary Focus Areas:\n`;
+
+      // Handle legacy focus.areas array
+      if (prefs.focus.areas && Array.isArray(prefs.focus.areas) && prefs.focus.areas.length > 0) {
+        prefs.focus.areas.forEach((area: string) => {
+          section += `- **${area}**: Always include detailed coverage\n`;
+        });
+      }
+
+      // Handle individual focus.* preferences (e.g., focus.ceo_leadership)
+      focusKeys.forEach((key: string) => {
+        if (key === 'areas') return; // Already handled above
+        const value = prefs.focus[key];
+        if (typeof value === 'string' && value) {
+          section += `- **${key.replace(/_/g, ' ')}**: ${value}\n`;
+        }
+      });
+
+      section += '\n';
+    }
   }
 
   if (prefs.summary?.brevity) {
@@ -400,7 +431,26 @@ If a user asks for MORE detail on a topic (e.g., "Tell me more about the CEO", "
 After synthesizing insights, offer three actionable next steps:
 1. Immediate action (e.g., "draft introduction email")
 2. Monitoring suggestion (e.g., "track this signal going forward")
-3. Offer to adjust research, phrased naturally as a teammate
+3. **MANDATORY when user asks follow-up questions**: Offer to save this preference for future research
+
+**CRITICAL P0 REQUIREMENT:**
+When a user asks a follow-up question requesting additional detail (e.g., "tell me about their CEO", "what's their tech stack?", "tell me about funding"), you MUST include a [SAVE_PREF] block AND make the third follow-up offer to always include this detail in future research.
+
+**Example scenario:**
+- User: "Research Gartner"
+- Agent: [provides research]
+- User: "tell me about their CEO"
+- Agent: [provides CEO details] + MUST include both:
+  1. [SAVE_PREF]key=focus.ceo_leadership|value=always include detailed CEO and leadership team information|label=Include CEO/leadership details in all company research[/SAVE_PREF]
+  2. Third follow-up: "Want me to always include CEO/leadership details in future company research?"
+
+**Common follow-up patterns that REQUIRE preference saving:**
+- CEO/leadership questions → focus.ceo_leadership
+- Tech stack questions → focus.tech_stack
+- Funding/financial questions → focus.funding_financials
+- Product/feature questions → focus.products_features
+- Customer/market questions → focus.customers_market
+- Security/compliance questions → focus.security_compliance
 
 IMPORTANT: Keep each follow-up concise (≤20 words). Do NOT include word count instructions in the user-facing output heading (e.g., don't write "Three quick follow-ups (20 words each)" - just write a clean heading like "Three quick follow-ups").
 
