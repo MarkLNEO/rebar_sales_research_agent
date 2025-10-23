@@ -649,9 +649,16 @@ These time-sensitive events create urgency (actively monitor):
 **CRITICAL OUTPUT REQUIREMENT - ${signalTerm.toUpperCase()} FORMAT**:
 You MUST include a "${signalTerm}" section in EVERY report showing findings for each configured signal type.
 
-REQUIRED FORMAT (use exact signal type names):
+REQUIRED FORMAT (use these exact signal type names - already formatted for display):
 ## ${signalTerm}
-${signals.map((s: any) => `- **${s.signal_type}** - [Your specific findings with brief context, dates, and impact]`).join('\n')}
+${signals.map((s: any) => {
+  // Humanize underscore-separated signal types for display
+  const displayName = s.signal_type
+    .split('_')
+    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  return `- **${displayName}** - [Your specific findings with brief context, dates, and impact]`;
+}).join('\n')}
 
 CORRECT EXAMPLES:
 - **Data breach** - Recent cybersecurity incident reported in Q3 2025, CEO mentioned need for security overhaul in earnings call
@@ -662,10 +669,10 @@ WRONG (too vague):
 - **Data breach**: Found some activity
 - **Leadership change**: See recent news
 
-If no activity found for a signal type, still list it:
-- **[Signal Type]** - No recent activity detected (last ${signals[0]?.lookback_days || 90} days)
+If no activity found for a signal type, still list it with the humanized name:
+- **[Humanized Signal Name]** - No recent activity detected (last ${signals[0]?.lookback_days || 90} days)
 
-USE THE EXACT SIGNAL TYPE NAMES configured by the user. DO NOT rename or summarize them.
+IMPORTANT: Use the humanized signal type names provided above (Title Case with spaces). These are already formatted for user display.
 </buying_signals>`;
   }
 
