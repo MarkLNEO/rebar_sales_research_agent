@@ -272,10 +272,13 @@ export async function POST(req: NextRequest) {
               : [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
 
             // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
-            reasoning: {
-              effort: reasoningEffort,
-              summary: 'detailed' as any // Required to enable reasoning summary streaming
-            },
+            // Skip reasoning config entirely if undefined (for follow-ups)
+            ...(reasoningEffort ? {
+              reasoning: {
+                effort: reasoningEffort,
+                summary: 'detailed' as any // Required to enable reasoning summary streaming
+              }
+            } : {}),
             
             store: true,
             metadata: {
