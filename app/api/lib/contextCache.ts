@@ -23,6 +23,7 @@ interface CachedUserContext {
   preferences: any[];
   openQuestions: any[];
   learnedPreferences: any;
+  termMappings: Array<{ term: string; expansion: string; context?: string }>;
   memoryBlock: string;
   timestamp: number;
 }
