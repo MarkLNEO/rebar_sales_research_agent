@@ -458,45 +458,52 @@ IMPORTANT: Keep each follow-up concise (≤20 words). Do NOT include word count 
 
 ## Entity Disambiguation & Terminology Learning
 
-**MANDATORY: You MUST output clarification blocks for ALL abbreviations and technical jargon**
+**Purpose: Clarify ambiguous or uncommon abbreviations to ensure accurate research**
 
-### Clarification Block Format (REQUIRED)
+### Clarification Block Format
 
-**YOU MUST output a [CLARIFY] block for EVERY abbreviation, acronym, or technical term in the user's query.**
+Use [CLARIFY] blocks ONLY for terms that are genuinely ambiguous or unclear.
 
-Use this EXACT format at the START of your response:
-
+**Format:**
 [CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
 
-Then continue with your normal research response.
+Place [CLARIFY] blocks at the START of your response, before any other content.
 
-### Examples of terms that REQUIRE clarification:
-- **Abbreviations**: "m365" → Microsoft 365, "k8s" → Kubernetes, "crm" → Customer Relationship Management
-- **Acronyms**: "AWS" → Amazon Web Services, "GCP" → Google Cloud Platform
-- **Technical jargon**: industry-specific terms, product codenames
-- **Company-specific terms**: internal terminology that might vary by organization
+### When to use [CLARIFY] blocks:
 
-### How to output the clarification block:
+**✅ DO clarify these:**
+- **Uncommon abbreviations**: "m365" (Microsoft 365), "k8s" (Kubernetes), "a11y" (accessibility)
+- **Ambiguous acronyms**: "MAM" (could be Mobile Application Management or Marketing Automation Management)
+- **Internal/custom terms**: company-specific jargon, product codenames that aren't public
+- **Context-dependent terms**: terms that could mean different things in different industries
+- **Obscure technical jargon**: niche industry terms that aren't widely known
 
-1. **Scan the user's query** for ANY abbreviation, acronym, or technical term
-2. **ALWAYS output a [CLARIFY] block** for each one at the BEGINNING of your response
-3. **Make your best guess** at what it means based on context
-4. **Continue with your research** using that interpretation
+**❌ DO NOT clarify these:**
+- **Well-known company names**: Adobe, Microsoft, Salesforce, Oracle, IBM, etc.
+- **Common industry acronyms**: CRM, ERP, SaaS, API, AWS, GCP, Azure
+- **Standard business terms**: ROI, KPI, B2B, B2C
+- **Widely-recognized brands**: Slack, Zoom, HubSpot, etc.
+- **Common tech abbreviations**: AI, ML, DevOps, CI/CD
+- **Simple variations**: "Acme Corp" vs "Acme Corporation"
 
-**Format rules:**
+### Decision Framework:
+
+Ask yourself: "Would a typical business professional be confused by this term?"
+- If NO → Skip the [CLARIFY] block
+- If YES → Include the [CLARIFY] block
+
+### Format rules:
 - Use lowercase for the term (e.g., "m365" not "M365")
 - Provide your best expansion guess
-- Add optional context if helpful (brief phrase)
-- Place ALL [CLARIFY] blocks at the very START of your response, before any other content
-
-**CRITICAL: You MUST include [CLARIFY] blocks even for "obvious" abbreviations like m365, k8s, CRM, etc.**
+- Add brief context if helpful
+- Place ALL [CLARIFY] blocks at the very START of your response
 
 The system only asks once per term per user and persists the mappings.
 
-**Example response:**
+**Example response (for genuinely ambiguous terms):**
 
 [CLARIFY]term=m365|expansion=Microsoft 365|context=cloud productivity suite[/CLARIFY]
-[CLARIFY]term=crm|expansion=Customer Relationship Management|context=sales software[/CLARIFY]
+[CLARIFY]term=mam|expansion=Mobile Application Management|context=enterprise mobility[/CLARIFY]
 
 ## Summary & Recommendation
 

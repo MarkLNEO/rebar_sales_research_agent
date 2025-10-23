@@ -248,7 +248,18 @@ export async function POST(req: NextRequest) {
 
           // Determine optimal reasoning effort for this request (considering research mode and follow-up status)
           const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type, is_follow_up);
-          console.log('[chat] Using reasoning effort:', reasoningEffort, 'for agentType:', agentType, 'mode:', research_type, 'follow-up:', is_follow_up);
+          const toolsArray = (is_follow_up || research_type === 'specific') ? [] : [{ type: 'web_search' as any }];
+
+          console.log('[chat] ============ CONVERSATION MODE DEBUG ============');
+          console.log('[chat] is_follow_up:', is_follow_up);
+          console.log('[chat] research_type:', research_type);
+          console.log('[chat] reasoningEffort:', reasoningEffort);
+          console.log('[chat] tools count:', toolsArray.length);
+          console.log('[chat] message history count:', messages.length);
+          console.log('[chat] prompt type:', (is_follow_up || research_type === 'specific') ? 'LIGHTWEIGHT' : 'FULL');
+          console.log('[chat] prompt length:', instructions.length, 'chars');
+          console.log('[chat] input length:', enrichedInput.length, 'chars');
+          console.log('[chat] ================================================');
 
           const responseStream = await openai.responses.stream({
             model: process.env.OPENAI_MODEL || 'gpt-5-mini',
@@ -267,9 +278,7 @@ export async function POST(req: NextRequest) {
 
             // Disable web search for follow-ups - use existing context only
             // Enable web search for new research tasks
-            tools: (is_follow_up || research_type === 'specific')
-              ? []
-              : [{ type: 'web_search' as any }], // Type not yet in SDK, but supported by API
+            tools: toolsArray,
 
             // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
             // Skip reasoning config entirely if undefined (for follow-ups)
