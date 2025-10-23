@@ -177,9 +177,12 @@ export function OnboardingEnhanced() {
           outputFormat: data.output_format || 'pdf',
           outputStyle: data.output_style || 'executive_summary',
         });
-        setCurrentStep(data.onboarding_step || 1);
-        // Always show the welcome mode for incomplete onboarding to keep flow consistent
-        setWelcomeMode(true);
+        const restoredStep = data.onboarding_step || 1;
+        setCurrentStep(restoredStep);
+        // Only show welcome mode if user hasn't started the guided flow yet (step 0 or missing)
+        // If they're on step 1+, they've chosen the guided path and should continue in step mode
+        // This prevents "research existing accounts" answers from triggering the research intent regex
+        setWelcomeMode(restoredStep === 0 || !data.onboarding_step);
       } else {
         setWelcomeMode(true);
       }
