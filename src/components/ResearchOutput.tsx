@@ -6,6 +6,8 @@ import { useToast } from './ToastProvider';
 import { Download, FileText, TrendingUp, Zap, Users, Target, Lightbulb, HelpCircle } from 'lucide-react';
 import { OptimizeICPModal } from './OptimizeICPModal';
 import { computeIcpScoreFromInputs } from '../../shared/scoring';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ResearchOutputProps {
   research: {
@@ -77,6 +79,14 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
   const [enriched, setEnriched] = useState<Record<string, { email?: string; linkedin_url?: string | null }>>({});
   const [enriching, setEnriching] = useState(false);
   const { addToast } = useToast();
+  const { user } = useAuth();
+
+  // Profile Alignment state (mirrors ICP, signals, and criteria verbatim)
+  const [profileAlignment, setProfileAlignment] = useState<{
+    icp?: string | null;
+    signals?: Array<{ label: string; importance?: string }>;
+    criteria?: Array<{ name: string; importance?: string }>;
+  }>({});
 
   const domain = useMemo(() => {
     try {
@@ -97,6 +107,37 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
     })();
     return () => { canceled = true; };
   }, [domain, research?.leadership_team]);
+
+  // Load a lightweight snapshot of the user's ICP, signals, and criteria for mirroring
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!user?.id) return;
+        const [profileRes, signalsRes, criteriaRes] = await Promise.all([
+          supabase.from('company_profiles').select('icp_definition').eq('user_id', user.id).maybeSingle(),
+          supabase.from('user_signal_preferences').select('signal_type, importance, config').eq('user_id', user.id),
+          supabase.from('user_custom_criteria').select('field_name, importance, display_order').eq('user_id', user.id).order('display_order', { ascending: true })
+        ]);
+
+        const icp = profileRes.data?.icp_definition ?? null;
+        const signals = Array.isArray(signalsRes.data)
+          ? signalsRes.data.map((s: any) => ({
+              label: typeof s?.config?.label === 'string' && s.config.label.trim() ? s.config.label.trim() : (String(s?.signal_type || '') || '').replace(/[-_]/g, ' ').replace(/\b\w/g, (m: string) => m.toUpperCase()),
+              importance: s?.importance || undefined,
+            }))
+          : [];
+        const criteria = Array.isArray(criteriaRes.data)
+          ? criteriaRes.data.map((c: any) => ({ name: c?.field_name || '', importance: c?.importance || undefined }))
+          : [];
+
+        if (!cancelled) setProfileAlignment({ icp, signals, criteria });
+      } catch (e) {
+        // Non-fatal: mirroring is best-effort
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Extract a domain from markdown/sources if structured company_data is missing
   const extractDomainFallback = (): string => {
@@ -189,6 +230,39 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
         <div className="bg-white border border-gray-200 rounded-xl p-4" data-testid="research-section-executive-summary">
           <h4 className="font-semibold text-gray-900 mb-2">Executive Summary</h4>
           <p className="text-gray-700 leading-relaxed">{research.executive_summary}</p>
+        </div>
+      )}
+
+      {/* Profile Alignment (mirrors user's ICP, signals, and criteria terms) */}
+      {(profileAlignment.icp || (profileAlignment.signals && profileAlignment.signals.length > 0) || (profileAlignment.criteria && profileAlignment.criteria.length > 0)) && (
+        <div className="bg-white border border-blue-200 rounded-xl p-4">
+          <h4 className="font-semibold text-gray-900 mb-2">Profile Alignment</h4>
+          {profileAlignment.icp && (
+            <div className="mb-2">
+              <span className="text-sm text-gray-600">ICP</span>
+              <p className="text-gray-900">{profileAlignment.icp}</p>
+            </div>
+          )}
+          {profileAlignment.signals && profileAlignment.signals.length > 0 && (
+            <div className="mb-2">
+              <span className="text-sm text-gray-600">Signals</span>
+              <ul className="mt-1 text-gray-900 list-disc list-inside text-sm">
+                {profileAlignment.signals.slice(0, 5).map((s, idx) => (
+                  <li key={idx}>{s.label}{s.importance ? ` (${s.importance})` : ''}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {profileAlignment.criteria && profileAlignment.criteria.length > 0 && (
+            <div>
+              <span className="text-sm text-gray-600">Criteria</span>
+              <ul className="mt-1 text-gray-900 list-disc list-inside text-sm">
+                {profileAlignment.criteria.slice(0, 5).map((c, idx) => (
+                  <li key={idx}>{c.name}{c.importance ? ` (${c.importance})` : ''}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

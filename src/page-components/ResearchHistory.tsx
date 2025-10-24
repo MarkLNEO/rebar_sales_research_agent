@@ -459,12 +459,42 @@ export function ResearchHistory() {
                   ) : selectedAccount && selectedResearch ? (
                     <>
                       <section className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
-                        <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-800">
                             <Layers className="w-4 h-4" />
                             {selectedAccount.company_name}
                           </span>
-                          <span className="text-xs text-gray-500">Tracked since {formatFullDate(selectedAccount.added_at)}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-500">Tracked since {formatFullDate(selectedAccount.added_at)}</span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  if (!confirm(`Remove "${selectedAccount.company_name}" from tracked accounts?`)) return;
+                                  const auth = (await supabase.auth.getSession()).data.session?.access_token;
+                                  if (!auth) throw new Error('Not authenticated');
+                                  const resp = await fetch('/api/accounts/manage', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}` },
+                                    body: JSON.stringify({ action: 'delete', companies: [{ company_name: selectedAccount.company_name }] })
+                                  });
+                                  if (!resp.ok) {
+                                    const t = await resp.text().catch(() => '');
+                                    throw new Error(t || `Remove failed (${resp.status})`);
+                                  }
+                                  addToast({ type: 'success', title: 'Removed', description: `${selectedAccount.company_name} is no longer tracked.` });
+                                  window.dispatchEvent(new CustomEvent('accounts-updated'));
+                                } catch (e: any) {
+                                  console.error('Remove tracked account failed', e);
+                                  addToast({ type: 'error', title: 'Remove failed', description: e?.message || 'Please try again.' });
+                                }
+                              }}
+                              className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-full hover:bg-red-100"
+                              title="Remove from tracked accounts"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
                           {typeof selectedAccount.icp_fit_score === 'number' && (

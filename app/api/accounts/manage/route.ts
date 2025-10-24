@@ -13,10 +13,13 @@ export async function POST(req: NextRequest) {
     const { action, companies } = body;
 
     if (action === 'add' && Array.isArray(companies)) {
+      // Align inserted columns with actual tracked_accounts schema (no 'domain' column)
       const records = companies.map(c => ({
         user_id: user.id,
         company_name: c.company_name || c.name,
-        domain: c.domain || null,
+        company_url: c.company_url ?? null,
+        industry: c.industry ?? null,
+        employee_count: typeof c.employee_count === 'number' ? c.employee_count : null,
         priority: c.priority || 'standard',
         metadata: c.metadata || {}
       }));
@@ -108,24 +111,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'update' && body?.company_name && body?.updates) {
-      const { company_name, updates } = body;
-      const { data, error } = await supabase
+      const { company_name } = body;
+      const updates = body.updates || {};
+      const payload: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (typeof updates.last_researched_at === 'string') payload.last_researched_at = updates.last_researched_at;
+      if (typeof updates.last_research_summary === 'string') payload.last_research_summary = updates.last_research_summary;
+
+      const doUpdate = async (u: Record<string, any>) => supabase
         .from('tracked_accounts')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(u)
         .eq('user_id', user.id)
         .eq('company_name', company_name)
         .select('id')
         .maybeSingle();
 
+      let { data, error } = await doUpdate(payload);
+      if (error && /column .* does not exist|last_research/i.test(String(error.message))) {
+        // Fallback for older schemas without last_research_summary
+        const minimal: Record<string, any> = { updated_at: payload.updated_at };
+        if (payload.last_researched_at) minimal.last_researched_at = payload.last_researched_at;
+        ({ data, error } = await doUpdate(minimal));
+      }
       if (error) throw error;
 
-      return Response.json({
-        success: true,
-        account: data,
-      });
+      return Response.json({ success: true, account: data });
     }
 
     if (action === 'list') {
@@ -158,22 +167,29 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          const { data: researchRows, error: researchError } = await supabase
+          // Prefer rich columns when available
+          let { data: researchRows, error: researchError } = await supabase
             .from('research_outputs')
             .select(
-              'id, account_id, subject, research_type, created_at, executive_summary, markdown_report, sources, metadata, icp_fit_score, signal_score, composite_score, priority_level, confidence_level'
+              'id, account_id, subject, research_type, created_at, executive_summary, markdown_report, sources'
             )
             .in('account_id', accountIds)
             .order('created_at', { ascending: false });
           if (researchError) {
-            console.warn('[accounts/manage] research_outputs query failed (schema mismatch tolerated):', researchError.message);
-          } else {
-            for (const row of researchRows || []) {
-              if (!row?.account_id) continue;
-              const bucket = researchByAccount.get(row.account_id) ?? [];
-              bucket.push(row);
-              researchByAccount.set(row.account_id, bucket);
-            }
+            console.warn('[accounts/manage] research_outputs rich query failed, falling back:', researchError.message);
+            // Fallback to a minimal projection for older schemas
+            const fallback = await supabase
+              .from('research_outputs')
+              .select('id, account_id, subject, created_at')
+              .in('account_id', accountIds)
+              .order('created_at', { ascending: false });
+            researchRows = fallback.data || [];
+          }
+          for (const row of researchRows || []) {
+            if (!row?.account_id) continue;
+            const bucket = researchByAccount.get(row.account_id) ?? [];
+            bucket.push(row);
+            researchByAccount.set(row.account_id, bucket);
           }
         } catch (e: any) {
           console.warn('[accounts/manage] research_outputs query error (tolerated):', e?.message || e);

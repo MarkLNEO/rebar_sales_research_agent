@@ -2062,6 +2062,8 @@ useEffect(() => {
         type: 'error',
       });
     }
+    // Return the inserted research row to the caller so we can associate account_id later
+    return inserted;
   };
 
   const handleSaveResearch = async (draft: ResearchDraft) => {
@@ -2069,7 +2071,7 @@ useEffect(() => {
     setSaving(true);
     setSaveError(null);
     try {
-      await persistResearchDraft(draft);
+      const saved = await persistResearchDraft(draft);
       setSaveOpen(false);
       const latestId = getLatestResearchMessageId();
       if (latestId) setRecentlySavedMessageId(latestId);
@@ -2080,6 +2082,29 @@ useEffect(() => {
       if (subjectForToast) {
         // Ensure an account exists for this subject so saves and dashboard stay unified
         const newlyTracked = await ensureTrackedAccount(subjectForToast);
+        // If we have a saved research row, call server route to link research to tracked account using service role
+        try {
+          const normalizedName = normalizeCompanyNameForTracking(String(subjectForToast || ''));
+          const { data: { session } } = await supabase.auth.getSession();
+          if (saved?.id && normalizedName && session?.access_token) {
+            const resp = await fetch('/api/research/link', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ research_id: saved.id, company_name: normalizedName })
+            });
+            if (!resp.ok) {
+              const t = await resp.text().catch(() => '');
+              console.warn('Link research to account failed', resp.status, t);
+            } else {
+              window.dispatchEvent(new CustomEvent('accounts-updated'));
+            }
+          }
+        } catch (e) {
+          console.warn('Associating research with tracked account failed:', e);
+        }
         addToast({
           type: 'success',
           title: newlyTracked ? '✓ Tracked and saved' : '✓ Research saved',
