@@ -19,7 +19,9 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:report": "node scripts/show-report-once.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "organize:docs": "node scripts/organize-docs.mjs",
+    "cleanup": "scripts/cleanup-local.sh"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
