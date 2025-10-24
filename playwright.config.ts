@@ -108,8 +108,8 @@ export default defineConfig({
   // Map to data-testid selectors
   testIdAttribute: 'data-testid',
 
-  // Global setup will write storageState
-  globalSetup: './tests/global-setup.ts',
+  // Global setup will write storageState (can be skipped with SKIP_GLOBAL_SETUP=1)
+  globalSetup: process.env.SKIP_GLOBAL_SETUP ? undefined as any : './tests/global-setup.ts',
 
   // Web server configuration (for local dev testing)
   webServer: process.env.TEST_BASE_URL ? undefined : {
