@@ -4633,40 +4633,43 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                 return (
                   <div className="space-y-2" data-testid="thinking-stack">
                     {/* CRITICAL: Show status/reasoning in unified format - seamless transition from mock to real */}
-                    {(latestStatus || (reasoningLine && !latestPlan && !latestWebSearch)) && (
-                      <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-900">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full flex-shrink-0"></div>
-                          <span className="font-medium truncate">
-                            {reasoningLine || latestStatus?.content || 'Loading...'}
-                          </span>
+                    {(latestStatus || (reasoningLine && !latestPlan && !latestWebSearch)) && (() => {
+                      // Unified progress/timer: show elapsed and progress toward ETA based on mode
+                      const format = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+                      const mode = lastRunMode || 'deep';
+                      // Task (deep/quick) ≈ 60s, Conversation (specific) ≈ 30s
+                      const ETA_SECONDS = mode === 'specific' ? 30 : 60;
+                      const pct = Math.min(99, Math.round(((mockReasoningElapsed || 0) / ETA_SECONDS) * 100));
+                      return (
+                        <div className="w-full bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs text-blue-900">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full flex-shrink-0"></div>
+                              <span className="font-medium truncate">
+                                {reasoningLine || latestStatus?.content || 'Loading...'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-blue-600 font-mono">{format(mockReasoningElapsed || 0)} / ~{format(ETA_SECONDS)}</span>
+                              <span className="text-blue-700">{pct}%</span>
+                              {reasoningLine && showInlineReasoning && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReasoningOpen(true)}
+                                  className="text-blue-700 hover:text-blue-900 text-xs whitespace-nowrap"
+                                  aria-label="View full reasoning"
+                                >
+                                  View all
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="w-full bg-blue-200/50 rounded-full h-1 mt-1">
+                            <div className="bg-blue-600 h-1 rounded-full transition-all duration-1000" style={{ width: `${pct}%` }} />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {mockReasoningElapsed > 0 && (
-                            <span className="text-blue-600 font-mono text-xs">
-                              {Math.floor(mockReasoningElapsed / 60)}:{String(mockReasoningElapsed % 60).padStart(2, '0')}
-                            </span>
-                          )}
-                          {reasoningLine && showInlineReasoning && (
-                            <button
-                              type="button"
-                              onClick={() => setReasoningOpen(true)}
-                              className="text-blue-700 hover:text-blue-900 text-xs whitespace-nowrap"
-                              aria-label="View full reasoning"
-                            >
-                              View all
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {latestPlan && (
-                      <ThinkingIndicator
-                        key={latestPlan.id}
-                        type="reasoning_progress"
-                        content={latestPlan.content}
-                      />
-                    )}
+                      );
+                    })()}
                     {/* Show web search activity when no content has streamed yet - provides early user feedback */}
                     {latestWebSearch && streamingMessage === '' && (
                       <ThinkingIndicator
