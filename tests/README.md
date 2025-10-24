@@ -44,6 +44,7 @@ npm run test:report
 | **Preferences** | `preferences.spec.ts` | Implicit learning, persistence, JIT prompts | ✅ 8 tests |
 | **Profile Coach** | `profile-coach.spec.ts` | Profile updates, ICP config, criteria setup | ✅ 17 tests |
 | **Memory & Context** | `memory.spec.ts` | Conversation context, memory persistence | ✅ 17 tests |
+| **UI Regression** | `ui/regression.spec.ts` | Reasoning layout, toolbar placement | ✅ 2 tests |
 | **Tracked Accounts** | `tracked-accounts.spec.ts` | Account tracking, signals, monitoring | 📝 Todo |
 | **Bulk Research** | `bulk-research.spec.ts` | CSV upload, batch processing, results | 📝 Todo |
 | **Settings** | `settings.spec.ts` | Settings updates, integrations, billing | 📝 Todo |
@@ -435,4 +436,3 @@ Parse JSON results in CI for:
 - [ ] Set up CI/CD pipeline
 - [ ] Add performance regression tracking
 - [ ] Add visual regression testing (Percy/Chromatic)
-

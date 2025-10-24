@@ -24,9 +24,19 @@ const DEFAULT_PROMPT_CONFIG = {
 
 const stripSaveProfileBlocks = (text: string): string => {
   if (typeof text !== 'string' || text.length === 0) return '';
+
+  // First strip complete JSON blocks
   let cleaned = text.replace(/```json\s*?\n\s*{[\s\S]*?"action"\s*:\s*"save_profile"[\s\S]*?}\s*```/gi, '');
   cleaned = cleaned.replace(/\{[\s\S]{0,800}?"action"\s*:\s*"save_profile"[\s\S]*?\}/gi, '');
-  return cleaned;
+
+  // Also strip incomplete JSON blocks that are still streaming (prevents flash)
+  // Remove anything from ```json onwards if it hasn't closed yet
+  cleaned = cleaned.replace(/```json[\s\S]*$/gi, '');
+
+  // Remove any opening brace followed by "action": "save_profile" that hasn't closed
+  cleaned = cleaned.replace(/\{\s*"action"\s*:\s*"save_profile"[\s\S]*$/gi, '');
+
+  return cleaned.trim();
 };
 
 type SaveProfilePayload = {
@@ -939,9 +949,8 @@ Onboarding flow:
       setStreamingMessage('');
       setThinkingEvents([]);
 
-      // Reload profile data to reflect changes
-      hasInitialized.current = false;
-      await initializeProfilePage(true);
+      // Reload profile data to reflect changes (but don't create new chat/greeting)
+      await refreshProfileData();
       invalidateUserProfileCache(user?.id);
       void refreshPreferences();
 
@@ -1842,16 +1851,6 @@ Onboarding flow:
                   />
                 ))}
 
-                {streamingMessage && (
-                  <MessageBubble
-                    role="assistant"
-                    content={streamingMessage}
-                    userName={getUserInitial()}
-                    showActions={false}
-                    agentType="company_profiler"
-                  />
-                )}
-
                 {thinkingEvents.length > 0 && (() => {
                   const latestReasoning = [...thinkingEvents].reverse().find(e => e.type === 'reasoning');
                   const latestWebSearch = [...thinkingEvents].reverse().find(e => e.type === 'web_search');
@@ -1876,6 +1875,16 @@ Onboarding flow:
                     </div>
                   );
                 })()}
+
+                {streamingMessage && (
+                  <MessageBubble
+                    role="assistant"
+                    content={streamingMessage}
+                    userName={getUserInitial()}
+                    showActions={false}
+                    agentType="company_profiler"
+                  />
+                )}
 
                 {loading && !streamingMessage && thinkingEvents.length === 0 && messages.length === 0 && (
                   <ThinkingIndicator type={"reasoning_progress" as any} content="Preparing suggestions..." />

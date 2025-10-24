@@ -4281,6 +4281,25 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                 );
               })}
 
+              {PREFS_SUMMARY_ENABLED && activeSummary && (
+                <div className="mt-4">
+                  <SummaryCard
+                    summary={activeSummary.data}
+                    onClose={() => setActiveSummary(null)}
+                  />
+                </div>
+              )}
+
+              {/* Show a timer indicator in the chat while drafting an email */}
+              {draftEmailPending && (
+                <ThinkingIndicator
+                  type="reasoning_progress"
+                  content={
+                    'Drafting personalized outreach…\nI\'ll paste the email here once it\'s ready.'
+                  }
+                />
+              )}
+
               {thinkingEvents.length > 0 && (() => {
                 const latestPlan = [...thinkingEvents].reverse().find(ev => ev.type === 'reasoning_progress');
                 const latestWebSearch = [...thinkingEvents].reverse().find(ev => ev.type === 'web_search');
@@ -4336,7 +4355,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                 if (!latestPlan && !reasoningLine && !latestWebSearch && !latestStatus) return null;
 
                 return (
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-testid="thinking-stack">
                     {/* CRITICAL: Show status/reasoning in unified format - seamless transition from mock to real */}
                     {(latestStatus || (reasoningLine && !latestPlan && !latestWebSearch)) && (
                       <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-900">
@@ -4385,25 +4404,6 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                   </div>
                 );
               })()}
-
-              {PREFS_SUMMARY_ENABLED && activeSummary && (
-                <div className="mt-4">
-                  <SummaryCard
-                    summary={activeSummary.data}
-                    onClose={() => setActiveSummary(null)}
-                  />
-                </div>
-              )}
-
-              {/* Show a timer indicator in the chat while drafting an email */}
-              {draftEmailPending && (
-                <ThinkingIndicator
-                  type="reasoning_progress"
-                  content={
-                    'Drafting personalized outreach…\nI\'ll paste the email here once it\'s ready.'
-                  }
-                />
-              )}
 
               {streamingMessage && (
                   <MessageBubble

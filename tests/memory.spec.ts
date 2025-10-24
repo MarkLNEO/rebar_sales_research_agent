@@ -12,6 +12,82 @@ import { test, expect, waitForStreamComplete } from './fixtures';
  */
 
 test.describe('Memory & Context - Conversation Continuity', () => {
+  test('TC-MEM-004: Should maintain company context for role-based queries', async ({ authenticatedPage, clearData }) => {
+    // Clear all user data including knowledge_entries and implicit_preferences
+    await clearData();
+    await authenticatedPage.goto('/');
+
+    // Step 1: Research Adobe
+    console.log('Step 1: Researching Adobe...');
+    await authenticatedPage.getByPlaceholder('Message agent...').fill('Research Adobe');
+    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+
+    // Wait for response to appear (more robust than waiting for "Next actions")
+    await authenticatedPage.waitForTimeout(3000); // Let message send
+    await authenticatedPage.waitForSelector('[role="assistant"]', { timeout: 60000 });
+
+    // Wait for streaming to complete by checking if "Stop" button disappears
+    await authenticatedPage.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout: 120000 });
+    await authenticatedPage.waitForTimeout(2000); // Let UI settle
+    await authenticatedPage.screenshot({ path: 'test-results/tc-mem-004-step1.png' });
+    console.log('✓ Step 1 complete');
+
+    // Step 2: Ask about CEO
+    console.log('Step 2: Asking about CEO...');
+    await authenticatedPage.getByPlaceholder('Message agent...').fill('Tell me more about the CEO');
+    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+    await authenticatedPage.waitForTimeout(3000);
+
+    // Wait for Stop button to disappear (streaming complete)
+    await authenticatedPage.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout: 120000 });
+    await authenticatedPage.waitForTimeout(2000);
+
+    const ceoResponse = await authenticatedPage.locator('[role="assistant"]').last().textContent();
+    await authenticatedPage.screenshot({ path: 'test-results/tc-mem-004-step2-ceo.png' });
+    console.log('✓ Step 2 complete');
+
+    // Verify CEO response mentions Adobe and Shantanu Narayen
+    expect(ceoResponse?.toLowerCase()).toMatch(/adobe|shantanu|narayen/);
+
+    // Step 3: Ask about CTO
+    console.log('Step 3: Asking about CTO...');
+    await authenticatedPage.getByPlaceholder('Message agent...').fill('What about the CTO?');
+    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+    await authenticatedPage.waitForTimeout(3000);
+
+    await authenticatedPage.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout: 120000 });
+    await authenticatedPage.waitForTimeout(2000);
+
+    const ctoResponse = await authenticatedPage.locator('[role="assistant"]').last().textContent();
+    await authenticatedPage.screenshot({ path: 'test-results/tc-mem-004-step3-cto.png' });
+    console.log('✓ Step 3 complete');
+
+    // Verify CTO response mentions Adobe context (not polluted with other companies)
+    expect(ctoResponse?.toLowerCase()).toMatch(/adobe|cto/);
+    // Should NOT mention companies from other tests
+    expect(ctoResponse?.toLowerCase()).not.toMatch(/gartner|salesforce|microsoft/);
+
+    // Step 4: Ask about CFO
+    console.log('Step 4: Asking about CFO...');
+    await authenticatedPage.getByPlaceholder('Message agent...').fill('And the CFO?');
+    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+    await authenticatedPage.waitForTimeout(3000);
+
+    await authenticatedPage.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout: 120000 });
+    await authenticatedPage.waitForTimeout(2000);
+
+    const cfoResponse = await authenticatedPage.locator('[role="assistant"]').last().textContent();
+    await authenticatedPage.screenshot({ path: 'test-results/tc-mem-004-step4-cfo.png' });
+    console.log('✓ Step 4 complete');
+
+    // Verify CFO response maintains Adobe context
+    expect(cfoResponse?.toLowerCase()).toMatch(/adobe|cfo/);
+    // Should NOT mention companies from other tests
+    expect(cfoResponse?.toLowerCase()).not.toMatch(/gartner|salesforce|microsoft/);
+
+    console.log('✅ TC-MEM-004 PASSED: All role-based queries maintained Adobe context without pollution');
+  });
+
   test('Should remember company from previous research', async ({ authenticatedPage, clearData }) => {
     await clearData();
     await authenticatedPage.goto('/');

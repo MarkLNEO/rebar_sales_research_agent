@@ -118,7 +118,11 @@ async function clearUserData(userId: string) {
   // Clear bulk research jobs
   await supabase.from('bulk_research_jobs').delete().eq('user_id', userId);
 
-  console.log(`Cleared test data for user ${userId}`);
+  // Clear user-global memory (critical for test isolation)
+  await supabase.from('knowledge_entries').delete().eq('user_id', userId);
+  await supabase.from('implicit_preferences').delete().eq('user_id', userId);
+
+  console.log(`Cleared test data for user ${userId} (including memory)`);
 }
 
 // Helper to measure performance
