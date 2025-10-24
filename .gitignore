@@ -34,10 +34,12 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+test-results/
 
 # Misc
 *.pem
 .vercel
+.codex/
 
 # Old build artifacts (if any remain)
 server-build/
