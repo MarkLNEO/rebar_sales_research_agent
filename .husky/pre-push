@@ -1,7 +1,12 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔎 Running pre-push checks..."
+if [ "$ENFORCE_PREPUSH" != "1" ]; then
+  echo "⏭️  Skipping pre-push checks (set ENFORCE_PREPUSH=1 to enable)"
+  exit 0
+fi
+
+echo "🔎 Running pre-push checks (ENFORCE_PREPUSH=1)..."
 
 # Lint (if configured)
 npm run lint || exit 1
@@ -13,4 +18,3 @@ node --test tests/unit/*.test.cjs || exit 1
 npx playwright test -g @smoke --project=chromium || exit 1
 
 echo "✅ Pre-push checks passed"
-

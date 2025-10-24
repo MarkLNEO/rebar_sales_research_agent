@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+
+// Load env for tests (test overrides, then local)
+dotenv.config({ path: '.env.test' });
+dotenv.config({ path: '.env.local' });
 
 /**
  * Playwright Configuration for Parallel E2E Testing
@@ -35,7 +40,7 @@ export default defineConfig({
 
   // Reporter configuration
   reporter: [
-    ['html', { outputFolder: 'test-results/html' }],
+    ['html', { outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'test-results/results.json' }],
     ['list'], // Console output
   ],
