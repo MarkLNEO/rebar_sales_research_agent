@@ -163,6 +163,17 @@ export function MessageBubble({
   const [expanded, setExpanded] = useState(false);
   const [savingPreference, setSavingPreference] = useState(false);
   const [savingTermMapping, setSavingTermMapping] = useState(false);
+  const [dismissedTerms, setDismissedTerms] = useState<Set<string>>(new Set());
+
+  // Helper: detect url/domain-like terms so we don't prompt users to confirm them
+  const isUrlOrDomain = (s: string): boolean => {
+    const term = (s || '').trim().toLowerCase();
+    if (!term) return false;
+    if (/^https?:\/\//i.test(term)) return true; // looks like a URL
+    // simple domain heuristic: has a dot, no spaces, valid chars
+    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(term) && !/\s/.test(term)) return true;
+    return false;
+  };
 
   // Parse preference capture blocks from AI response
   const { cleanContent, preferences } = useMemo(() => {
@@ -231,6 +242,12 @@ export function MessageBubble({
 
     return { finalContent: cleaned, termMappings: detectedTerms };
   }, [cleanContent]);
+
+  // Terms to actually display (skip url-like and any that were just confirmed)
+  const visibleTermMappings = useMemo(() => {
+    if (!termMappings?.length) return [] as Array<{ term: string; expansion: string; context?: string }>;
+    return termMappings.filter(m => !isUrlOrDomain(m.term) && !dismissedTerms.has(m.term));
+  }, [termMappings, dismissedTerms]);
 
   const safeContent = finalContent;
   const isCompanyResearch = agentType === 'company_research';
@@ -320,6 +337,8 @@ export function MessageBubble({
         title: 'Term saved',
         description: `"${mapping.term}" will now expand to "${mapping.expansion}"`,
       });
+      // Dismiss this mapping chip immediately in the UI
+      setDismissedTerms(prev => new Set(prev).add(mapping.term));
     } catch (error) {
       console.error('Failed to save term mapping:', error);
       addToast({
@@ -884,11 +903,11 @@ export function MessageBubble({
         </div>
       )}
 
-      {termMappings.length > 0 && role === 'assistant' && !streaming && (
+  {visibleTermMappings.length > 0 && role === 'assistant' && !streaming && (
         <div className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 shadow-sm">
           <div className="text-xs font-semibold text-purple-900 uppercase tracking-wide mb-2">🔤 Confirm term meaning?</div>
           <div className="space-y-2">
-            {termMappings.map((mapping, idx) => (
+            {visibleTermMappings.map((mapping, idx) => (
               <div key={`${mapping.term}-${idx}`} className="flex items-center justify-between bg-white border border-purple-200 rounded-lg px-3 py-2">
                 <div className="flex-1">
                   <span className="text-sm font-semibold text-purple-900">&ldquo;{mapping.term}&rdquo;</span>
