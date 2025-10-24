@@ -67,8 +67,8 @@ Tests require these test accounts to exist in your Supabase database:
 
 | Email | Password | Role |
 |-------|----------|------|
-| `cliff.test@rebarhq.com` | (set in tests/fixtures.ts) | Account Executive |
-| `sarah.test@rebarhq.com` | (set in tests/fixtures.ts) | Sales Director |
+| `cliff.test@rebarhq.ai` | (set in tests/fixtures.ts) | Account Executive |
+| `sarah.test@rebarhq.ai` | (set in tests/fixtures.ts) | Sales Director |
 
 **How to create:**
 1. Go to Supabase dashboard → Authentication → Users

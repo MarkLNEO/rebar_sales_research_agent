@@ -12,7 +12,7 @@ config({ path: resolve(__dirname, '../.env.local') });
 
 const TEST_USERS = [
   {
-    email: 'cliff.test@rebarhq.com',
+    email: 'cliff.test@rebarhq.ai',
     password: 'Test123!@#',
     metadata: {
       full_name: 'Cliff Test',
@@ -21,7 +21,7 @@ const TEST_USERS = [
     }
   },
   {
-    email: 'sarah.test@rebarhq.com',
+    email: 'sarah.test@rebarhq.ai',
     password: 'Test123!@#',
     metadata: {
       full_name: 'Sarah Test',

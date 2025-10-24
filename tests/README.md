@@ -89,13 +89,13 @@ Pre-configured test users in `tests/fixtures.ts`:
 ```typescript
 const TEST_USERS = {
   cliff: {
-    email: 'cliff.test@rebarhq.com',
+    email: 'cliff.test@rebarhq.ai',
     password: 'Test123!@#',
     role: 'Account Executive',
     company: 'Acme Security Solutions',
   },
   sarah: {
-    email: 'sarah.test@rebarhq.com',
+    email: 'sarah.test@rebarhq.ai',
     password: 'Test123!@#',
     role: 'Sales Director',
     company: 'TechCorp Inc',
@@ -300,12 +300,12 @@ Create test users in Supabase:
 ```sql
 -- Create test user
 INSERT INTO auth.users (email, encrypted_password, email_confirmed_at)
-VALUES ('cliff.test@rebarhq.com', crypt('Test123!@#', gen_salt('bf')), now());
+VALUES ('cliff.test@rebarhq.ai', crypt('Test123!@#', gen_salt('bf')), now());
 
 -- Create profile
 INSERT INTO user_profiles (user_id, user_role, company)
 VALUES (
-  (SELECT id FROM auth.users WHERE email = 'cliff.test@rebarhq.com'),
+  (SELECT id FROM auth.users WHERE email = 'cliff.test@rebarhq.ai'),
   'Account Executive',
   'Acme Security Solutions'
 );

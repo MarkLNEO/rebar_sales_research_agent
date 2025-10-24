@@ -99,22 +99,22 @@ The tests need two pre-existing users:
 ```sql
 -- User 1: Cliff (Account Executive)
 INSERT INTO auth.users (email, encrypted_password, email_confirmed_at)
-VALUES ('cliff.test@rebarhq.com', crypt('Test123!@#', gen_salt('bf')), now());
+VALUES ('cliff.test@rebarhq.ai', crypt('Test123!@#', gen_salt('bf')), now());
 
 INSERT INTO user_profiles (user_id, user_role, company)
 VALUES (
-  (SELECT id FROM auth.users WHERE email = 'cliff.test@rebarhq.com'),
+  (SELECT id FROM auth.users WHERE email = 'cliff.test@rebarhq.ai'),
   'Account Executive',
   'Acme Security Solutions'
 );
 
 -- User 2: Sarah (Sales Director)
 INSERT INTO auth.users (email, encrypted_password, email_confirmed_at)
-VALUES ('sarah.test@rebarhq.com', crypt('Test123!@#', gen_salt('bf')), now());
+VALUES ('sarah.test@rebarhq.ai', crypt('Test123!@#', gen_salt('bf')), now());
 
 INSERT INTO user_profiles (user_id, user_role, company)
 VALUES (
-  (SELECT id FROM auth.users WHERE email = 'sarah.test@rebarhq.com'),
+  (SELECT id FROM auth.users WHERE email = 'sarah.test@rebarhq.ai'),
   'Sales Director',
   'TechCorp Inc'
 );
@@ -250,8 +250,8 @@ test('Complete onboarding wizard', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: /sign up/i }).click();
 
-  const testEmail = `test-${Date.now()}@rebarhq.com`;
-  await page.getByPlaceholder('you@company.com').fill(testEmail);
+  const testEmail = `test-${Date.now()}@rebarhq.ai`;
+  await page.getByPlaceholder('you@company.ai').fill(testEmail);
   await page.getByPlaceholder('Choose a password').fill('Test123!@#');
   await page.getByRole('button', { name: /create account/i }).click();
 
@@ -347,7 +347,7 @@ Test user credentials:
 
 ```typescript
 test('user test', async ({ testUser }) => {
-  console.log(testUser.email); // cliff.test@rebarhq.com
+  console.log(testUser.email); // cliff.test@rebarhq.ai
   console.log(testUser.role);  // Account Executive
 });
 ```

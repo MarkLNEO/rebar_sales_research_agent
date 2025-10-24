@@ -18,7 +18,7 @@ async function testLogin() {
     await page.waitForLoadState('domcontentloaded');
 
     // Fill login form
-    await page.getByPlaceholder('you@company.com').fill('cliff.test@rebarhq.com');
+    await page.getByPlaceholder('you@company.com').fill('cliff.test@rebarhq.cai);
     await page.locator('input[type="password"]').fill('Test123!@#');
 
     // Click login

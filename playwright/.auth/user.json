@@ -1,14 +1,4 @@
 {
   "cookies": [],
-  "origins": [
-    {
-      "origin": "http://localhost:3000",
-      "localStorage": [
-        {
-          "name": "sb-matxrspxbaqegvyliyba-auth-token",
-          "value": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IkJWN3RPR00zd2oyWmt6UzEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL21hdHhyc3B4YmFxZWd2eWxpeWJhLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI0YjU2YzkyMS1jOTg2LTQzMzEtODc1Zi1mNjc3YzhkYmM4ZTUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYxMjkzNDM2LCJpYXQiOjE3NjEyODk4MzYsImVtYWlsIjoiY2xpZmYudGVzdEBuZXZlcmV2ZXJvcmRpbmFyeS5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoiY2xpZmYudGVzdEBuZXZlcmV2ZXJvcmRpbmFyeS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiI0YjU2YzkyMS1jOTg2LTQzMzEtODc1Zi1mNjc3YzhkYmM4ZTUifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc2MTI4OTgzNn1dLCJzZXNzaW9uX2lkIjoiZGZjMTYwZWQtYmQzYS00N2E5LTkxMWMtNTdlZGFjZWJiNjRhIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.73V6QT4vUNlrZgFixAMxVcaGw-3PIR9kNNFCGiswXUw\",\"token_type\":\"bearer\",\"expires_in\":3600,\"expires_at\":1761293436,\"refresh_token\":\"cthvhzlkjzhi\",\"user\":{\"id\":\"4b56c921-c986-4331-875f-f677c8dbc8e5\",\"aud\":\"authenticated\",\"role\":\"authenticated\",\"email\":\"cliff.test@nevereverordinary.com\",\"email_confirmed_at\":\"2025-10-22T20:42:46.54704Z\",\"phone\":\"\",\"confirmed_at\":\"2025-10-22T20:42:46.54704Z\",\"last_sign_in_at\":\"2025-10-24T07:10:36.100843728Z\",\"app_metadata\":{\"provider\":\"email\",\"providers\":[\"email\"]},\"user_metadata\":{\"email\":\"cliff.test@nevereverordinary.com\",\"email_verified\":true,\"phone_verified\":false,\"sub\":\"4b56c921-c986-4331-875f-f677c8dbc8e5\"},\"identities\":[{\"identity_id\":\"29c83173-433f-4fdb-8b18-32cd5df7ab97\",\"id\":\"4b56c921-c986-4331-875f-f677c8dbc8e5\",\"user_id\":\"4b56c921-c986-4331-875f-f677c8dbc8e5\",\"identity_data\":{\"email\":\"cliff.test@nevereverordinary.com\",\"email_verified\":false,\"phone_verified\":false,\"sub\":\"4b56c921-c986-4331-875f-f677c8dbc8e5\"},\"provider\":\"email\",\"last_sign_in_at\":\"2025-10-22T20:42:46.513868Z\",\"created_at\":\"2025-10-22T20:42:46.514508Z\",\"updated_at\":\"2025-10-22T20:42:46.514508Z\",\"email\":\"cliff.test@nevereverordinary.com\"}],\"created_at\":\"2025-10-22T20:42:46.351434Z\",\"updated_at\":\"2025-10-24T07:10:36.154852Z\",\"is_anonymous\":false},\"weak_password\":null}"
-        }
-      ]
-    }
-  ]
+  "origins": []
 }

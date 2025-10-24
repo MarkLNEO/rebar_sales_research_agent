@@ -18,7 +18,7 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/');
     await page.getByRole('link', { name: /sign up/i }).click();
 
-    const testEmail = `test-onboarding-${Date.now()}@rebarhq.com`;
+    const testEmail = `test-onboarding-${Date.now()}@rebarhq.ai`;
     await page.getByPlaceholder('you@company.com').fill(testEmail);
     await page.getByPlaceholder('Choose a password').fill('Test123!@#');
     await page.getByRole('button', { name: /create account|sign up/i }).click();
@@ -90,7 +90,7 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/');
     await page.getByRole('link', { name: /sign up/i }).click();
 
-    const testEmail = `test-skip-${Date.now()}@rebarhq.com`;
+    const testEmail = `test-skip-${Date.now()}@rebarhq.ai`;
     await page.getByPlaceholder('you@company.com').fill(testEmail);
     await page.getByPlaceholder('Choose a password').fill('Test123!@#');
     await page.getByRole('button', { name: /create account|sign up/i }).click();
@@ -122,7 +122,7 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/');
     await page.getByRole('link', { name: /sign up/i }).click();
 
-    const testEmail = `test-persist-${Date.now()}@rebarhq.com`;
+    const testEmail = `test-persist-${Date.now()}@`;
     const testPassword = 'Test123!@#';
 
     await page.getByPlaceholder('you@company.com').fill(testEmail);
@@ -185,7 +185,7 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/');
     await page.getByRole('link', { name: /sign up/i }).click();
 
-    const testEmail = `test-advanced-${Date.now()}@rebarhq.com`;
+    const testEmail = `test-advanced-${Date.now()}@`;
     await page.getByPlaceholder('you@company.com').fill(testEmail);
     await page.getByPlaceholder('Choose a password').fill('Test123!@#');
     await page.getByRole('button', { name: /create account|sign up/i }).click();
