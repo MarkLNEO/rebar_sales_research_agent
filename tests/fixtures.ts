@@ -302,14 +302,29 @@ export async function checkReasoningStream(page: Page) {
 
 // Detect common API error banners/messages in the UI
 export async function hasApiError(page: Page): Promise<boolean> {
+  // Common error banners/toasts we should never see in happy-path flows
   const candidates = [
     'Chat API error',
     'Invalid token',
     'Streaming failed',
+    'Could not save research preferences',
+    'Failed with status',
+    'Failed to save preference',
+    'Failed to save term mapping',
+    'Access restricted',
+    'Account tracking unavailable',
+    'Research failed',
   ];
   for (const text of candidates) {
     const visible = await page.getByText(new RegExp(text, 'i')).isVisible().catch(() => false);
     if (visible) return true;
   }
   return false;
+}
+
+export async function assertNoApiError(page: Page) {
+  const hasError = await hasApiError(page);
+  if (hasError) {
+    throw new Error('Detected API/UI error banner during E2E run');
+  }
 }
