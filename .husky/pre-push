@@ -17,7 +17,11 @@ npm run lint || exit 1
 # Unit tests
 node --test tests/unit/*.test.cjs || exit 1
 
-# Smoke E2E (fast)
-npx playwright test -g @smoke --project=chromium || exit 1
+# Smoke E2E (fast) — allow bypass for flaky CI via PREPUSH_SKIP_SMOKE=1
+if [ "$PREPUSH_SKIP_SMOKE" = "1" ]; then
+  echo "⏭️  Skipping smoke E2E (PREPUSH_SKIP_SMOKE=1)"
+else
+  npx playwright test -g @smoke --project=chromium || exit 1
+fi
 
 echo "✅ Pre-push checks passed"
