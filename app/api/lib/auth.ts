@@ -6,8 +6,15 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export function isEmailAllowed(email?: string | null): boolean {
   if (!email) return false;
   if (process.env.ACCESS_ALLOW_BYPASS === 'true') return true;
-  const allowlist = (process.env.ACCESS_ALLOWLIST || '').split(/[;,\s]+/).filter(Boolean).map(s => s.toLowerCase());
-  const domains = (process.env.ACCESS_ALLOWED_DOMAINS || '').split(/[;,\s]+/).filter(Boolean).map(s => s.toLowerCase());
+  const allowlist = (process.env.ACCESS_ALLOWLIST || '')
+    .split(/[;,\s]+/)
+    .filter(Boolean)
+    .map(s => s.toLowerCase());
+  // Accept entries with or without leading '@', split by common separators
+  const domains = (process.env.ACCESS_ALLOWED_DOMAINS || '')
+    .split(/[;,\s]+/)
+    .filter(Boolean)
+    .map(s => s.toLowerCase().replace(/^@/, '')); // strip leading '@' if provided
   if (allowlist.length === 0 && domains.length === 0) return true;
   const lower = email.toLowerCase();
   if (allowlist.includes(lower)) return true;
