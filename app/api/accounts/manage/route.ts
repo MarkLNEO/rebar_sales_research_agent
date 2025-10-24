@@ -168,7 +168,8 @@ export async function POST(req: NextRequest) {
 
         try {
           // Prefer rich columns when available
-          let { data: researchRows, error: researchError } = await supabase
+          let researchRowsAny: any[] = [];
+          const { data: researchRows, error: researchError } = await supabase
             .from('research_outputs')
             .select(
               'id, account_id, subject, research_type, created_at, executive_summary, markdown_report, sources'
@@ -183,9 +184,17 @@ export async function POST(req: NextRequest) {
               .select('id, account_id, subject, created_at')
               .in('account_id', accountIds)
               .order('created_at', { ascending: false });
-            researchRows = fallback.data || [];
+            researchRowsAny = (fallback.data || []).map((r: any) => ({
+              ...r,
+              research_type: null,
+              executive_summary: null,
+              markdown_report: null,
+              sources: [],
+            }));
+          } else {
+            researchRowsAny = researchRows || [];
           }
-          for (const row of researchRows || []) {
+          for (const row of researchRowsAny || []) {
             if (!row?.account_id) continue;
             const bucket = researchByAccount.get(row.account_id) ?? [];
             bucket.push(row);
