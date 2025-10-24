@@ -227,7 +227,11 @@ export function snapshotName(testName: string, step: string): string {
 export async function waitForStreamComplete(page: Page, timeout = 120000) {
   // Wait for either "Next actions" or error state
   await Promise.race([
+    // Preferred sentinel for deterministic completion
+    page.getByTestId('stream-complete').waitFor({ timeout }),
+    // Backwards-compatibility with older UIs
     page.getByText('Next actions').waitFor({ timeout }),
+    // Error state
     page.getByText('error', { exact: false }).waitFor({ timeout }),
   ]);
 }

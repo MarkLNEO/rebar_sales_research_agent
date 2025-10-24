@@ -5,6 +5,7 @@ import { Streamdown } from 'streamdown';
 import { useToast } from './ToastProvider';
 import { Download, FileText, TrendingUp, Zap, Users, Target, Lightbulb, HelpCircle } from 'lucide-react';
 import { OptimizeICPModal } from './OptimizeICPModal';
+import { computeIcpScoreFromInputs } from '../../shared/scoring';
 
 interface ResearchOutputProps {
   research: {
@@ -193,6 +194,21 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Scores */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {(() => {
+          // Deterministic fallback: compute score if not provided
+          if (typeof research.icp_fit_score !== 'number') {
+            const derived = computeIcpScoreFromInputs({
+              criteria: Array.isArray(research.custom_criteria_assessment) ? research.custom_criteria_assessment : [],
+              signals: Array.isArray(research.buying_signals) ? research.buying_signals : [],
+              employee_count: typeof research?.company_data?.employee_count === 'number' ? research.company_data.employee_count : null,
+              industry: typeof research?.company_data?.industry === 'string' ? research.company_data.industry : null,
+            });
+            (research as any).icp_fit_score = derived.score;
+            (research as any).icp_score_version = derived.version;
+            (research as any).icp_score_breakdown = derived.breakdown;
+          }
+          return null;
+        })()}
         <ScoreCard
           label="ICP Fit Score"
           score={research.icp_fit_score}
@@ -221,27 +237,23 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
             onClick={() => setShowIcpWhy(v => !v)}
             className="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900"
           >
-            <HelpCircle className="w-3.5 h-3.5" /> Why this score?
+            <HelpCircle className="w-3.5 h-3.5" /> How is this calculated?
           </button>
           {showIcpWhy && (
             <div className="mt-2 bg-white border border-blue-100 rounded-lg p-3">
-              {Array.isArray(research.custom_criteria_assessment) && research.custom_criteria_assessment.length > 0 ? (
+              {Array.isArray((research as any).icp_score_breakdown) && (research as any).icp_score_breakdown.length > 0 ? (
                 <div className="text-sm text-gray-800">
-                  <div className="font-semibold mb-1">Criteria evaluation</div>
+                  <div className="font-semibold mb-1">Scoring breakdown (version {(research as any).icp_score_version || 'icp-v1.0.0'})</div>
                   <ul className="list-disc list-inside space-y-1">
-                    {research.custom_criteria_assessment.slice(0, 8).map((c: any, idx: number) => (
-                      <li key={idx}>
-                        <span className="font-medium">{c.name || c.field_name || 'Criterion'}:</span>{' '}
-                        <span className={`${c.status === 'met' ? 'text-green-700' : c.status === 'unknown' ? 'text-gray-700' : 'text-red-700'}`}>{String(c.status || c.value || 'unknown')}</span>
-                        {c.source && (
-                          <span className="text-xs text-gray-500"> — source: {typeof c.source === 'string' ? c.source : ''}</span>
-                        )}
+                    {(research as any).icp_score_breakdown.map((b: any, idx: number) => (
+                      <li key={idx} className={b.delta >= 0 ? 'text-green-700' : 'text-red-700'}>
+                        {b.label} {b.delta >= 0 ? `(+${b.delta})` : `(${b.delta})`}
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <div className="text-sm text-gray-700">This score is based on default criteria and recent signal strength.</div>
+                <div className="text-sm text-gray-700">This score is computed from your criteria (critical/important/nice‑to‑have), recent priority signals, and basic size hints. To improve accuracy, define more criteria and keep signal preferences up to date.</div>
               )}
               <div className="mt-2">
                 <button
@@ -249,7 +261,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
                   onClick={() => setOptimizeOpen(true)}
                   className="text-xs font-semibold text-blue-700 hover:text-blue-900 underline"
                 >
-                  Optimize ICP
+                  Improve my ICP
                 </button>
               </div>
             </div>

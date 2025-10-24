@@ -4679,7 +4679,10 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
 
               {/* Next Actions bar after a completed assistant turn */}
               {actionBarVisible && !streamingMessage && lastAssistantMessage && (
-                <section className="mt-6 mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <section
+                  className="mt-6 mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                  data-testid="stream-complete"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Next actions</h3>
                     <div className="hidden sm:block text-xs text-gray-500">

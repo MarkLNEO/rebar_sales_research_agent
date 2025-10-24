@@ -160,7 +160,7 @@ export function Sidebar({
         <div
           ref={accountSectionRef}
           id="tracked-accounts-panel"
-          className="max-h-[50vh] overflow-y-auto border-t border-gray-200 mb-2"
+          className="max-h-[40vh] overflow-y-auto border-t border-gray-200 mb-2"
         >
           <AccountListWidget
             onAccountClick={onAccountClick}

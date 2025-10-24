@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔎 Running pre-push checks..."
+
+# Lint (if configured)
+npm run lint || exit 1
+
+# Unit tests
+node --test tests/unit/*.test.cjs || exit 1
+
+# Smoke E2E (fast)
+npx playwright test -g @smoke --project=chromium || exit 1
+
+echo "✅ Pre-push checks passed"
+

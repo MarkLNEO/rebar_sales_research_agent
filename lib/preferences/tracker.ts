@@ -6,7 +6,8 @@
  */
 
 import type { PreferenceUpsert } from './store';
-import { supabase } from '@/src/lib/supabase';
+// Use relative import to avoid reliance on TS path aliases in Node test env
+import { supabase } from '../../src/lib/supabase';
 
 export type UserInteraction = 
   | { type: 'section_expanded'; section: string; chatId: string }

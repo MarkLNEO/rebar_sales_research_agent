@@ -17,6 +17,15 @@ test.describe('UI Regression - Chat Layout', () => {
     const streamingMessage = authenticatedPage.locator('[data-testid="message-assistant"]').last();
     await expect(streamingMessage).toBeVisible({ timeout: 20000 });
 
+    // Timer or spinner should be visible within thinking stack
+    const timerOrSpinner = authenticatedPage
+      .locator('[data-testid="thinking-stack"]').locator('text=/^\\d{1,2}:[0-5]\\d$/');
+    const spinner = authenticatedPage
+      .locator('[data-testid="thinking-stack"]').locator('.animate-spin');
+    const timerVisible = await timerOrSpinner.isVisible().catch(() => false);
+    const spinnerVisible = await spinner.isVisible().catch(() => false);
+    expect(timerVisible || spinnerVisible).toBeTruthy();
+
     const thinkingHandle = await thinking.elementHandle();
     const messageHandle = await streamingMessage.elementHandle();
     if (!thinkingHandle || !messageHandle) {

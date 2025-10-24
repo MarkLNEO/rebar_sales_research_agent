@@ -63,12 +63,19 @@ export default defineConfig({
 
     // Browser context options
     viewport: { width: 1280, height: 720 },
+    timezoneId: 'UTC',
+    locale: 'en-US',
+    colorScheme: 'light',
+    actionTimeout: 15000,
 
     // Ignore HTTPS errors (for local dev)
     ignoreHTTPSErrors: true,
 
     // Headless mode (can override with --headed flag)
     headless: true,
+
+    // Use pre-auth state from globalSetup
+    storageState: 'playwright/.auth/user.json',
   },
 
   // Test projects for different browsers (optional)
@@ -94,6 +101,15 @@ export default defineConfig({
     //   use: { ...devices['Pixel 5'] },
     // },
   ],
+
+  // Additional safety in CI
+  forbidOnly: !!process.env.CI,
+
+  // Map to data-testid selectors
+  testIdAttribute: 'data-testid',
+
+  // Global setup will write storageState
+  globalSetup: './tests/global-setup.ts',
 
   // Web server configuration (for local dev testing)
   webServer: process.env.TEST_BASE_URL ? undefined : {

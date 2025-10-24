@@ -56,8 +56,32 @@ async function loadTracker() {
   if (require.cache[trackerModulePath]) {
     delete require.cache[trackerModulePath];
   }
-  // eslint-disable-next-line global-require, import/no-dynamic-require
-  return require(trackerModulePath).preferenceTracker;
+
+  const Module = require('module');
+  const originalLoad = Module._load;
+  Module._load = function mockLoad(request, parent, isMain) {
+    // Intercept supabase client import used by tracker to avoid env deps
+    if (request.includes('src/lib/supabase') || request.endsWith('/src/lib/supabase') || request === '../../src/lib/supabase') {
+      return {
+        supabase: {
+          auth: {
+            async getSession() {
+              // Simulate no session so tracker falls back to localStorage
+              return { data: { session: null } };
+            },
+          },
+        },
+      };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    return require(trackerModulePath).preferenceTracker;
+  } finally {
+    Module._load = originalLoad;
+  }
 }
 
 test('preference tracker persists repeated follow-up topics as implicit preferences', async () => {
