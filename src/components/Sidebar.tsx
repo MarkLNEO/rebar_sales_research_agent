@@ -55,7 +55,21 @@ export function Sidebar({
 }: SidebarProps) {
   const { signOut } = useAuth();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const accountSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Determine initial responsive state and listen for resizes
+    const updateIsMobile = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    updateIsMobile();
+    window.addEventListener('resize', updateIsMobile);
+    return () => window.removeEventListener('resize', updateIsMobile);
+  }, []);
+
+  // Collapse by default on mobile to avoid squishing the chat pane
+  useEffect(() => {
+    if (isMobile) setIsExpanded(false);
+  }, [isMobile]);
 
   useEffect(() => {
     const handleShowAccounts = () => {
@@ -73,12 +87,31 @@ export function Sidebar({
     return () => window.removeEventListener('show-tracked-accounts', handleShowAccounts);
   }, []);
 
+  const containerClass = (() => {
+    if (isMobile) {
+      // On mobile: full-screen overlay when expanded; hidden when collapsed
+      return `${isExpanded ? 'fixed inset-0 z-40 w-full max-w-none' : 'w-0'} bg-white border-r border-gray-200 flex flex-col py-4 transition-all duration-300`;
+    }
+    // Desktop/tablet: classic collapsible rail
+    return `${isExpanded ? 'w-64' : 'w-12'} bg-white border-r border-gray-200 flex flex-col py-4 transition-all duration-300`;
+  })();
+
   return (
     <div
-      className={`${isExpanded ? 'w-64' : 'w-12'} bg-white border-r border-gray-200 flex flex-col py-4 transition-all duration-300`}
+      className={containerClass}
       data-testid="sidebar"
       data-state={isExpanded ? 'expanded' : 'collapsed'}
     >
+      {/* Mobile-only opener when collapsed */}
+      {isMobile && !isExpanded && (
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="fixed left-3 top-3 z-30 w-10 h-10 rounded-full bg-white/90 border border-gray-300 shadow flex items-center justify-center text-gray-700"
+          aria-label="Open sidebar"
+        >
+          <LayoutGrid className="w-5 h-5" />
+        </button>
+      )}
       <div className="px-2 mb-2">
         <button
           onClick={() => setIsExpanded(!isExpanded)}

@@ -193,7 +193,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
     }
   };
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-6" data-testid="research-output">
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 md:p-6 space-y-4 md:space-y-6" data-testid="research-output">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -227,7 +227,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Executive Summary */}
       {research.executive_summary && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4" data-testid="research-section-executive-summary">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-4" data-testid="research-section-executive-summary">
           <h4 className="font-semibold text-gray-900 mb-2">Executive Summary</h4>
           <p className="text-gray-700 leading-relaxed">{research.executive_summary}</p>
         </div>
@@ -235,7 +235,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Profile Alignment (mirrors user's ICP, signals, and criteria terms) */}
       {(profileAlignment.icp || (profileAlignment.signals && profileAlignment.signals.length > 0) || (profileAlignment.criteria && profileAlignment.criteria.length > 0)) && (
-        <div className="bg-white border border-blue-200 rounded-xl p-4">
+        <div className="bg-white border border-blue-200 rounded-xl p-3 md:p-4">
           <h4 className="font-semibold text-gray-900 mb-2">Profile Alignment</h4>
           {profileAlignment.icp && (
             <div className="mb-2">
@@ -348,7 +348,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Company Data */}
       {research.company_data && Object.keys(research.company_data).length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5" data-testid="research-section-company-overview">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-5" data-testid="research-section-company-overview">
           <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Users className="w-5 h-5" />
             Company Overview
@@ -520,7 +520,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Personalization Points */}
       {research.personalization_points && research.personalization_points.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5" data-testid="research-section-personalization">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-5" data-testid="research-section-personalization">
           <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Lightbulb className="w-5 h-5 text-yellow-600" />
             Personalization Points
@@ -545,7 +545,7 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
 
       {/* Recommended Actions */}
       {research.recommended_actions && Object.keys(research.recommended_actions).length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5" data-testid="research-section-recommended-actions">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-5" data-testid="research-section-recommended-actions">
           <h4 className="font-semibold text-gray-900 mb-4">Recommended Actions</h4>
           <div className="space-y-3">
             {research.recommended_actions.timing && (
@@ -571,14 +571,14 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
       )}
 
       {Array.isArray(research.sources) && research.sources.length > 0 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5" data-testid="research-section-sources">
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 md:p-5" data-testid="research-section-sources">
           <h4 className="font-semibold text-gray-900 mb-3">Sources & Citations</h4>
           <ul className="space-y-2 text-sm">
             {research.sources.map((source: any, idx: number) => (
               <li key={idx} className="flex items-start gap-2">
                 <span className="text-gray-400">{idx + 1}.</span>
                 {source?.url ? (
-                  <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 underline">
+                  <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 underline break-words break-all">
                     {source.title || source.url}
                   </a>
                 ) : (
@@ -612,8 +612,8 @@ function FullReport({ markdown }: { markdown: string }) {
         </button>
       </div>
       {open && (
-        <div className="mt-3 bg-white border border-gray-200 rounded-xl p-4">
-          <Streamdown className="prose prose-sm max-w-none text-gray-800">
+        <div className="mt-3 bg-white border border-gray-200 rounded-xl p-3 md:p-4">
+          <Streamdown className="prose prose-sm md:prose max-w-none text-gray-800 break-words">
             {markdown}
           </Streamdown>
         </div>
