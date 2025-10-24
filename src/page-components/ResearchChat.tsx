@@ -2062,8 +2062,6 @@ useEffect(() => {
         type: 'error',
       });
     }
-    // Return the inserted research row to the caller so we can associate account_id later
-    return inserted;
   };
 
   const handleSaveResearch = async (draft: ResearchDraft) => {
