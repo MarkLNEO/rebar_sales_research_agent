@@ -1,15 +1,14 @@
 # RebarHQ - B2B Sales Intelligence Platform
 
-AI-powered company research with personalized terminology, preference learning, and comprehensive web-sourced insights.
+AI‑powered company research with exact terminology, consistent scoring, and compact, production‑ready UX.
 
-## 🌟 Latest Updates (v2.0)
+## 📚 Docs
 
-### ✅ **UAT Compliance Complete** - Score: 9.5/10
-- **Preference Learning**: Agent learns and uses your exact terminology
-- **Web Search**: Comprehensive research with real-time web sources
-- **Watchlist Persistence**: Always shows what's being monitored
-- **Custom Terminology**: "Indicators" instead of "Buying Signals" - your words, your way
-- **Production Ready**: All critical features tested and optimized
+- docs/README.md – Quickstart, environment, and common tasks
+- docs/Architecture.md – Agents, prompts, context loader, Responses API
+- docs/Testing.md – Unit + Playwright, local vs CI, debug tips
+- docs/Conventions.md – Code style, naming, folder layout
+- docs/Changelog.md – High‑level product changes and rationale
 
 ## Quick Start
 
@@ -99,12 +98,13 @@ app/
 └── layout.tsx                     # Root layout with providers
 
 src/                               # React Components & Logic
-├── components/                    # Reusable UI components
+├── components/                    # Reusable UI components (MessageBubble, Sidebar, etc.)
 ├── contexts/                      # React contexts
 ├── hooks/                         # Custom hooks
 ├── pages/                         # Page components
 ├── services/                      # API service layer
-└── utils/                         # Utility functions
+├── utils/                         # Utility functions
+└── ../shared/                     # Cross‑layer logic (e.g., deterministic scoring)
 ```
 
 ## Example Usage

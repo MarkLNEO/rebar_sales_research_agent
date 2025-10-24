@@ -18,7 +18,7 @@
     "test:memory": "playwright test tests/memory.spec.ts",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
-    "test:report": "playwright show-report",
+    "test:report": "node scripts/show-report-once.js",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -45,6 +45,7 @@
     "@playwright/test": "^1.47.0",
     "@axe-core/playwright": "^4.10.1",
     "husky": "^9.0.0",
+    "dotenv": "^16.4.5",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

@@ -219,6 +219,9 @@ class PreferenceTracker {
     this.debounceTimer = setTimeout(() => {
       this.flush();
     }, 3000); // Save after 3 seconds of no activity
+
+    // In Node test environments, don't keep the event loop alive
+    (this.debounceTimer as any)?.unref?.();
   }
 
   /**
@@ -227,6 +230,11 @@ class PreferenceTracker {
   async flush() {
     if (!this.userId || this.pendingPreferences.length === 0) {
       return;
+    }
+
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
     }
 
     const prefsToSave = [...this.pendingPreferences];
@@ -325,6 +333,10 @@ class PreferenceTracker {
    * Reset state (useful for testing)
    */
   reset() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     this.state = {
       sectionEngagement: new Map(),
       researchDepth: new Map(),
