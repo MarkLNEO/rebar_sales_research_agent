@@ -8,6 +8,9 @@ fi
 
 echo "🔎 Running pre-push checks (ENFORCE_PREPUSH=1)..."
 
+# Build (fail fast if prod build breaks)
+npm run build || exit 1
+
 # Lint (if configured)
 npm run lint || exit 1
 
