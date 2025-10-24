@@ -74,8 +74,22 @@ export function useUserProfile(forceRefresh = false) {
           .eq('user_id', user.id)
       ]);
 
+      let profileValue = profileResult.data;
+      if (!profileValue) {
+        try {
+          if (typeof window !== 'undefined' && user?.id) {
+            const draft = window.localStorage.getItem(`profileDraft:${user.id}`);
+            if (draft) {
+              profileValue = JSON.parse(draft);
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+
       const newData = {
-        profile: profileResult.data,
+        profile: profileValue,
         customCriteriaCount: criteriaResult.count || 0,
         signalPreferencesCount: signalsResult.count || 0,
         disqualifiersCount: disqualifiersResult.count || 0,
@@ -137,8 +151,9 @@ export function useUserProfile(forceRefresh = false) {
     const { profile } = profileData;
     if (!profile) {
       try {
+        const key = user?.id ? `onboardingComplete:${user.id}` : 'onboardingComplete';
         // Temporary bypass when onboarding just finished client-side
-        return window.localStorage.getItem('onboardingComplete') === '1';
+        return window.localStorage.getItem(key) === '1';
       } catch { return false; }
     }
 

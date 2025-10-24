@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase';
 import { Send, Sparkles } from 'lucide-react';
 import { invalidateUserProfileCache, primeUserProfileCache } from '../hooks/useUserProfile';
 import { isGenericPlaceholder } from '../utils/companyValidation';
+import { parseCriteriaInput } from '../utils/criteriaParser';
+import { slugToTitle, toSlug } from '../utils/string';
 
 interface Message {
   id: string;
@@ -60,6 +62,17 @@ const RESEARCH_FOCUS_OPTIONS = [
   { id: 'hiring', label: 'Hiring trends' },
 ];
 
+const deriveSignalLabel = (input: string, slug: string): string => {
+  const cleaned = input
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned.length > 0) {
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+  return slugToTitle(slug);
+};
+
 export function OnboardingEnhanced() {
   const { user } = useAuth();
   const router = useRouter();
@@ -89,6 +102,7 @@ export function OnboardingEnhanced() {
 
   const [customCriteria, setCustomCriteria] = useState<CustomCriterion[]>([]);
   const [selectedSignals, setSelectedSignals] = useState<string[]>([]);
+  const [signalLabels, setSignalLabels] = useState<Record<string, string>>({});
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
 
   const recommendedFocus = useMemo(() => {
@@ -110,6 +124,7 @@ export function OnboardingEnhanced() {
   const [currentCriterionStep, setCurrentCriterionStep] = useState<'importance' | null>(null);
   const [tempCriterion, setTempCriterion] = useState<Partial<CustomCriterion>>({});
   const [confirmPending, setConfirmPending] = useState<{ name: string; url?: string } | null>(null);
+  const getStorageKey = (base: string) => (user?.id ? `${base}:${user.id}` : base);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -183,6 +198,29 @@ export function OnboardingEnhanced() {
         // If they're on step 1+, they've chosen the guided path and should continue in step mode
         // This prevents "research existing accounts" answers from triggering the research intent regex
         setWelcomeMode(restoredStep === 0 || !data.onboarding_step);
+
+        if (user) {
+          const { data: existingSignals } = await supabase
+            .from('user_signal_preferences')
+            .select('signal_type, config')
+            .eq('user_id', user.id);
+
+          if (existingSignals && Array.isArray(existingSignals)) {
+            const labels: Record<string, string> = {};
+            const ids: string[] = [];
+            existingSignals.forEach((row: any) => {
+              const slug = typeof row?.signal_type === 'string' ? row.signal_type : '';
+              if (!slug) return;
+              const labelFromConfig = typeof row?.config?.label === 'string' ? row.config.label : '';
+              labels[slug] = labelFromConfig.trim().length > 0 ? labelFromConfig.trim() : slugToTitle(slug);
+              ids.push(slug);
+            });
+            if (ids.length > 0) {
+              setSelectedSignals(Array.from(new Set(ids)));
+              setSignalLabels(labels);
+            }
+          }
+        }
       } else {
         setWelcomeMode(true);
       }
@@ -258,18 +296,39 @@ export function OnboardingEnhanced() {
     }]);
   };
 
-  const saveProgress = async (step: number, data: any) => {
+  const saveProgress = async (step: number, data: Record<string, any>) => {
     if (!user) return;
 
-    await supabase
+    const payload = {
+      user_id: user.id,
+      onboarding_step: step,
+      ...data,
+    };
+
+    const { data: savedProfile, error } = await supabase
       .from('company_profiles')
-      .upsert({
-        user_id: user.id,
-        onboarding_step: step,
-        ...data,
-      }, {
-        onConflict: 'user_id'
-      });
+      .upsert(payload, { onConflict: 'user_id' })
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[onboarding] Failed to save progress', error);
+    }
+
+    const mergedProfile = savedProfile ?? payload;
+
+    primeUserProfileCache(user.id, {
+      ...mergedProfile,
+      onboarding_step: step,
+    }, {
+      customCriteriaCount: customCriteria.length,
+      signalPreferencesCount: selectedSignals.length,
+      disqualifiersCount: 0,
+    });
+
+    try {
+      localStorage.setItem(getStorageKey('profileDraft'), JSON.stringify(mergedProfile));
+    } catch {}
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -304,8 +363,10 @@ export function OnboardingEnhanced() {
       const looksLikeResearch = /^(research|find|show|compare|analy[sz]e|what can you do\??|who is|what is)\b/i.test(input.trim());
       if (looksLikeResearch) {
         try {
-          localStorage.setItem('onboardingComplete', '1');
-          localStorage.setItem('skipHomeGate', '1');
+          localStorage.setItem(getStorageKey('onboardingComplete'), '1');
+          localStorage.setItem(getStorageKey('skipHomeGate'), '1');
+          localStorage.removeItem('onboardingComplete');
+          localStorage.removeItem('skipHomeGate');
         } catch {}
         router.push(`/?q=${encodeURIComponent(input.trim())}`);
         return;
@@ -529,7 +590,7 @@ export function OnboardingEnhanced() {
                 signal_type: sig,
                 importance: 'important',
                 lookback_days: 90,
-                config: {},
+                config: { label: signalLabels[sig] ?? slugToTitle(sig) },
               }));
               await supabase.from('user_signal_preferences').insert(rows);
             }
@@ -559,7 +620,8 @@ export function OnboardingEnhanced() {
           Object.entries(SIGNAL_OPTIONS).forEach(([category, signals]) => {
             signalList += `${category}:\n`;
             signals.forEach(signal => {
-              signalList += `• ${signal.replace(/_/g, ' ')} (${signal})\n`;
+              const label = slugToTitle(signal);
+              signalList += `• ${label} (${signal})\n`;
             });
             signalList += '\n';
           });
@@ -568,15 +630,43 @@ export function OnboardingEnhanced() {
           break;
         }
 
-        // Parse comma-separated list into normalized ids
-        const entries = input
+        const rawEntries = input
           .split(',')
-          .map(s => s.trim().toLowerCase().replace(/\s+/g, '_'))
+          .map(s => s.trim())
           .filter(Boolean);
-        const merged = Array.from(new Set([...selectedSignals, ...entries]));
-        setSelectedSignals(merged);
-        const human = (list: string[]) => list.map(x => x.replace(/_/g, ' ')).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join(', ');
-        await addAgentMessage(`Now tracking: ${human(merged)}\n\nType more or "done" to continue.`);
+
+        if (rawEntries.length === 0) {
+          await addAgentMessage('I couldn\'t identify any signals. Try listing them separated by commas, such as "Data breach, Leadership change".');
+          break;
+        }
+
+        const newLabels: Record<string, string> = {};
+        const newIds: string[] = [];
+
+        rawEntries.forEach(entry => {
+          const slug = toSlug(entry);
+          if (!slug) return;
+          const label = deriveSignalLabel(entry, slug);
+          newLabels[slug] = label;
+          newIds.push(slug);
+        });
+
+        if (newIds.length === 0) {
+          await addAgentMessage('I couldn\'t identify any signals. Try listing them separated by commas, such as "Data breach, Leadership change".');
+          break;
+        }
+
+        const combinedLabels = { ...signalLabels, ...newLabels };
+        setSignalLabels(combinedLabels);
+
+        const mergedIds = Array.from(new Set([...selectedSignals, ...newIds]));
+        setSelectedSignals(mergedIds);
+
+        const humanList = mergedIds
+          .map(id => combinedLabels[id] || slugToTitle(id))
+          .join(', ');
+
+        await addAgentMessage(`Now tracking: ${humanList}\n\nType more or "done" to continue.`);
         break;
       }
 
@@ -632,44 +722,12 @@ export function OnboardingEnhanced() {
  * - Natural language grouping
  */
 const parseCriteriaFromInput = async (input: string): Promise<string[]> => {
-    try {
-      // Call LLM-based parsing API (gpt-5-nano)
-      const response = await fetch('/api/ai/parse-criteria', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input }),
-      });
-
-      if (!response.ok) {
-        console.error('[parseCriteria] API error:', response.status);
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-
-      if (data.criteria && Array.isArray(data.criteria)) {
-        return data.criteria.filter((c: string) => c.trim().length > 0);
-      }
-
-      throw new Error('Invalid response format');
-    } catch (error) {
-      console.error('[parseCriteria] Error calling parse-criteria API:', error);
-
-      // Fallback: Simple parsing if API fails
-      // This maintains basic functionality even if LLM is unavailable
-      const hasNumbering = /\d+\.\s+/.test(input);
-      if (hasNumbering) {
-        const parts = input.split(/\d+\.\s+/).map(part => part.trim()).filter(part => part.length > 3);
-        return parts;
-      }
-
-      const lines = input
-        .split(/\n|;/)
-        .map(line => line.trim())
-        .filter(line => line.length > 3);
-
-      return lines.length > 0 ? lines : [input.trim()];
-    }
+  const parsed = parseCriteriaInput(input);
+  if (parsed.length > 0) {
+    return parsed;
+  }
+  const trimmed = input.trim();
+  return trimmed ? [trimmed] : [];
 };
 
 const inferFieldTypeFromCriterion = (criterion: string): 'text' | 'number' | 'boolean' | 'list' => {
@@ -884,8 +942,14 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
 
     try {
       // Bypass HomeGate while caches settle
-      window.localStorage.setItem('skipHomeGate', '1');
-      window.localStorage.setItem('onboardingComplete', '1');
+      const skipKey = getStorageKey('skipHomeGate');
+      const completeKey = getStorageKey('onboardingComplete');
+      window.localStorage.setItem(skipKey, '1');
+      window.localStorage.setItem(completeKey, '1');
+      try {
+        window.localStorage.removeItem('skipHomeGate');
+        window.localStorage.removeItem('onboardingComplete');
+      } catch {}
     } catch {}
 
     router.replace('/');
@@ -909,8 +973,10 @@ const deriveCompanyNameFromUrl = (raw: string): string => {
     if (path === 'immediate') {
       const q = starter || 'Research Boeing';
       try {
-        localStorage.setItem('onboardingComplete', '1');
-        localStorage.setItem('skipHomeGate', '1');
+        localStorage.setItem(getStorageKey('onboardingComplete'), '1');
+        localStorage.setItem(getStorageKey('skipHomeGate'), '1');
+        localStorage.removeItem('onboardingComplete');
+        localStorage.removeItem('skipHomeGate');
       } catch {}
       router.push(`/?q=${encodeURIComponent(q)}`);
       return;

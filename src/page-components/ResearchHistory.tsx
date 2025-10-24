@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { jsPDF } from 'jspdf';
-import { Building2, RefreshCw, Clock, Sparkles, Layers } from 'lucide-react';
+import { Building2, RefreshCw, Clock, Sparkles, Layers, Info } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { ResearchOutput } from '../components/ResearchOutput';
 import { useAuth } from '../contexts/AuthContext';
@@ -339,9 +339,9 @@ export function ResearchHistory() {
         <header className="border-b border-gray-200 bg-white px-6 py-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Tracked Accounts</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Research History</h1>
               <p className="mt-1 text-sm text-gray-600">
-                Every account you monitor keeps its research timeline here. Pick an account to review the latest report or step through prior updates.
+                Review saved briefs and tracked account timelines. Pick an account to see the latest report or step through prior updates.
               </p>
             </div>
             <button
@@ -446,7 +446,17 @@ export function ResearchHistory() {
                 </aside>
 
                 <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-                  {selectedAccount && selectedResearch ? (
+                  {selectedAccount && (!selectedAccount.research_history || selectedAccount.research_history.length === 0) ? (
+                    <div className="flex h-full items-center justify-center">
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-sm text-gray-600">
+                        <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                          <Info className="h-4 w-4" />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800">No research saved yet</p>
+                        <p className="mt-2 text-sm text-gray-600">Run company research or save the latest briefing to build this timeline.</p>
+                      </div>
+                    </div>
+                  ) : selectedAccount && selectedResearch ? (
                     <>
                       <section className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
                         <div className="flex flex-wrap items-center gap-3">

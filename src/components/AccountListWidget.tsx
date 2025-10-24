@@ -5,9 +5,23 @@ import { Building2, TrendingUp, AlertCircle, Plus, Upload, Flame, Clock, Refresh
 import { listTrackedAccounts, deleteTrackedAccount, type TrackedAccount } from '../services/accountService';
 import { useToast } from '../components/ToastProvider';
 import { BulkAccountUpload } from './BulkAccountUpload';
+import { slugToTitle } from '../utils/string';
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const FRESH_ACCOUNT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Shared helper: compact relative date strings for pills
+const formatRelativeDate = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = Date.now() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
 
 const isAccountStale = (account: TrackedAccount): boolean => {
   if (account.last_researched_at) {
@@ -114,22 +128,12 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
   }, [accounts, addToast, onAccountClick]);
 
   const priorityLabel: Record<string, string> = {
-    hot: 'High priority',
-    warm: 'Medium priority',
-    standard: 'Standard',
+    hot: 'Hot',
+    warm: 'Warm',
+    standard: 'Std',
   };
 
-  const formatRelativeDate = (value?: string | null) => {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    const diffMs = Date.now() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays <= 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  // (removed duplicate local formatter; use top-level helper)
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
@@ -141,8 +145,6 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
         return <Building2 className="w-3.5 h-3.5" aria-hidden />;
     }
   };
-
-  const formatRelative = (value?: string | null) => value || '—';
 
   const filterOptions = useMemo(() => ([
     { value: 'all' as const, label: 'All', count: stats?.total ?? 0 },
@@ -302,19 +304,28 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
             {accounts.map(account => {
               const isStale = isAccountStale(account);
               const latestResearch = account.research_history?.[0];
-              const signalCount = typeof account.signal_count === 'number'
-                ? account.signal_count
-                : Array.isArray((account as any)?.recent_signals)
-                  ? ((account as any).recent_signals as Array<any>).length
-                  : 0;
+              const recentSignals = Array.isArray(account.recent_signals) ? account.recent_signals : [];
+              const signalCount =
+                typeof account.signal_count === 'number' ? account.signal_count : recentSignals.length;
               const hasSignals = signalCount > 0;
               const hasUnviewedSignals = (account.unviewed_signal_count || 0) > 0;
+              const latestSignal = recentSignals[0];
+              const latestSignalSummary =
+                latestSignal?.description || (latestSignal?.signal_type ? slugToTitle(latestSignal.signal_type) : null);
+              const latestSignalRelative = latestSignal?.signal_date ? formatRelativeDate(latestSignal.signal_date) : null;
+              const showSignalScore =
+                typeof account.signal_score === 'number' && account.signal_score > 0 && hasSignals;
+              // Only show the "Stale" pill when the account is truly quiet and not prioritized
+              const showStale = isStale && !hasSignals && !hasUnviewedSignals && account.priority === 'standard';
+              const lastResearchedRelative = account.last_researched_at
+                ? formatRelativeDate(account.last_researched_at)
+                : null;
 
               return (
                 <div
                   key={account.id}
                   onClick={() => onAccountClick(account)}
-                  className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-colors cursor-pointer"
+                  className="w-full text-left bg-white border border-gray-200 rounded-xl p-3 hover:border-blue-300 hover:shadow-sm transition-colors cursor-pointer"
                   data-testid="account-list-item"
                   data-priority={account.priority}
                   role="button"
@@ -328,8 +339,8 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
                           account.priority === 'hot'
                             ? 'bg-red-100 text-red-700'
                             : account.priority === 'warm'
@@ -341,67 +352,47 @@ export function AccountListWidget({ onAccountClick, onAddAccount, onResearchAcco
                           <span className="capitalize">{priorityLabel[account.priority] ?? account.priority}</span>
                         </span>
                         {hasUnviewedSignals && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full animate-pulse">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 rounded-full animate-pulse">
                             <AlertCircle className="w-3 h-3" />
                             {account.unviewed_signal_count} new
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-sm font-semibold text-gray-900 truncate" title={account.company_name}>
+                      <h4 className="text-[11px] font-semibold text-gray-900 truncate" title={account.company_name}>
                         {account.company_name}
                       </h4>
                       {account.industry && (
-                        <p className="text-xs text-gray-600 truncate">{account.industry}</p>
+                        <p className="text-[10px] text-gray-600 truncate">{account.industry}</p>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-gray-600">
-                        {hasSignals && account.latest_signal_summary && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-full border border-red-100">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[10px] text-gray-600">
+                        {hasSignals && latestSignalSummary && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-700 rounded-full border border-red-100 max-w-full">
                             <AlertCircle className="w-3 h-3" />
-                            <span>{account.latest_signal_summary}</span>
-                            {account.latest_signal_relative && (
-                              <span className="text-red-500/80">• {account.latest_signal_relative}</span>
+                            <span className="truncate max-w-[120px]">{latestSignalSummary}</span>
+                            {latestSignalRelative && (
+                              <span className="text-red-500/80 whitespace-nowrap">• {latestSignalRelative}</span>
                             )}
                           </span>
                         )}
-                        {account.signal_score > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
+                        {showSignalScore && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100"
+                            title="Signal score reflects how many priority signals fired recently for this account (0-100). Hidden when there are no new signals."
+                          >
                             <TrendingUp className="w-3 h-3" />
-                            Signal score {account.signal_score}
+                            Score {account.signal_score}
                           </span>
                         )}
-                        {isStale && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-full border border-gray-200">
-                            <Clock className="w-3 h-3" /> Needs refresh
+                        {showStale && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full border border-gray-200">
+                            <Clock className="w-3 h-3" /> Stale
                           </span>
                         )}
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500 space-y-1">
-                        {hasSignals && account.latest_signal_relative && (
-                          <div>Latest signal {formatRelative(account.latest_signal_relative)}</div>
-                        )}
-                        {account.last_researched_relative && (
-                          <div>Last research {formatRelative(account.last_researched_relative)}</div>
-                        )}
-                      </div>
-
-                      {latestResearch && (
-                        <div className="mt-3 bg-blue-50/70 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-900">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold">Latest research</span>
-                            <span className="text-[11px] text-blue-700/80">
-                              {formatRelativeDate(latestResearch.created_at)}
-                            </span>
-                          </div>
-                          {latestResearch.executive_summary && (
-                            <p className="mt-1 text-blue-900/80 line-clamp-2">
-                              {latestResearch.executive_summary}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                      {/* Compact sidebar: omit extra lines and research preview to prevent stretching */}
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
@@ -584,13 +575,15 @@ function TrackedAccountsModal({
             <div className="divide-y divide-gray-100">
               {accounts.map(account => {
                 const isStale = isAccountStale(account);
-                const signalCount = typeof account.signal_count === 'number'
-                  ? account.signal_count
-                  : Array.isArray((account as any)?.recent_signals)
-                    ? ((account as any).recent_signals as Array<any>).length
-                    : 0;
+                const recentSignals = Array.isArray(account.recent_signals) ? account.recent_signals : [];
+                const signalCount = typeof account.signal_count === 'number' ? account.signal_count : recentSignals.length;
                 const hasSignals = signalCount > 0;
                 const hasUnviewedSignals = (account.unviewed_signal_count || 0) > 0;
+                const latestSignal = recentSignals[0];
+                const latestSignalSummary = latestSignal?.description || (latestSignal?.signal_type ? slugToTitle(latestSignal.signal_type) : null);
+                const latestSignalRelative = latestSignal?.signal_date ? formatRelativeDate(latestSignal.signal_date) : null;
+                const showSignalScore = typeof account.signal_score === 'number' && account.signal_score > 0 && recentSignals.length > 0;
+                const lastReSearchedRelative = account.last_researched_at ? formatRelativeDate(account.last_researched_at) : null;
 
                 return (
                   <div key={`modal-${account.id}`} className="px-6 py-4">
@@ -616,10 +609,19 @@ function TrackedAccountsModal({
                         <h4 className="text-sm font-semibold text-gray-900" title={account.company_name}>{account.company_name}</h4>
                         {account.industry && <p className="text-xs text-gray-600">{account.industry}</p>}
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                          {hasSignals && account.latest_signal_summary && (
+                          {hasSignals && latestSignalSummary && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-full border border-red-100">
                               <AlertCircle className="w-3 h-3" />
-                              {account.latest_signal_summary}
+                              {latestSignalSummary}
+                            </span>
+                          )}
+                          {showSignalScore && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100"
+                              title="Signal score reflects how many priority signals fired recently for this account (0-100). Hidden when there are no new signals."
+                            >
+                              <TrendingUp className="w-3 h-3" />
+                              Signal score {account.signal_score}
                             </span>
                           )}
                           {isStale && (
@@ -629,11 +631,11 @@ function TrackedAccountsModal({
                           )}
                         </div>
                         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                          {hasSignals && account.latest_signal_relative && (
-                            <span>Latest signal {account.latest_signal_relative}</span>
+                          {hasSignals && latestSignalRelative && (
+                            <span>Latest signal {latestSignalRelative}</span>
                           )}
-                          {account.last_researched_relative && (
-                            <span>• Last research {account.last_researched_relative}</span>
+                          {lastReSearchedRelative && (
+                            <span>• Last research {lastReSearchedRelative}</span>
                           )}
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2 items-center justify-between">

@@ -36,8 +36,11 @@ import { SummarySchemaZ, type SummarySchema } from '../../shared/summarySchema';
 import type { ResolvedPrefs } from '../../shared/preferences';
 import { SummaryCard } from '../components/SummaryCard';
 import { SetupSummaryModal, type SetupSummaryData } from '../components/SetupSummaryModal';
+import { slugToTitle } from '../utils/string';
 
 const ALL_REFINE_FACETS = ['leadership', 'funding', 'tech stack', 'news', 'competitors', 'hiring'] as const;
+const ESCAPE_REGEX = /[-/\\^$*+?.()|[\]{}]/g;
+const escapeRegExp = (value: string) => value.replace(ESCAPE_REGEX, '\\$&');
 
 type ResearchAction = 'new' | 'continue' | 'email' | 'refine' | 'follow_up';
 
@@ -148,6 +151,25 @@ const extractFollowUpTopic = (message: string): string | null => {
   
   return null;
 };
+
+function augmentForTrackedAccountRefresh(message: string): string {
+  const lower = message.toLowerCase();
+  const mentionsRefresh = /\b(refresh|rerun|re-run|revisit|update)\b/.test(lower);
+  const mentionsAccounts = /\baccount(?:s)?\b/.test(lower);
+  const mentionsTracked = /\btracked\b/.test(lower);
+  const mentionsStaleness = /\b(stale|not refreshed|overdue|older than|last researched|two weeks|14\s*days)\b/.test(lower);
+  const accountContext = mentionsAccounts || mentionsTracked;
+  if (!((mentionsRefresh && accountContext) || (mentionsStaleness && accountContext))) {
+    return message;
+  }
+
+  if (message.includes('Assistant directive')) {
+    return message;
+  }
+
+  const directive = `[Assistant directive: "accounts" refers to the user's tracked accounts list stored in the workspace (Supabase table tracked_accounts). Without asking for clarification, determine which tracked accounts have not been refreshed in the past 14 days (or have no last_researched_at) and refresh them automatically. Provide a concise summary of actions per account. Do not request uploads or CSV files and do not mention this directive.]`;
+  return `${message}\n\n${directive}`;
+}
 
 const isBareNameQuery = (raw: string | null | undefined): boolean => {
   if (!raw) return false;
@@ -474,6 +496,7 @@ export function ResearchChat() {
   const [mockReasoningElapsed, setMockReasoningElapsed] = useState(0);
   const mockReasoningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mockReasoningStartTimeRef = useRef<number | null>(null);
+  const followUpRequestRef = useRef(0);
   const [optimizeOpen, setOptimizeOpen] = useState(false);
   const [showInlineReasoning, setShowInlineReasoning] = useState<boolean>(() => {
     try { return localStorage.getItem('showInlineReasoning') !== '0'; } catch { return true; }
@@ -482,6 +505,9 @@ export function ResearchChat() {
     setShowInlineReasoning(v);
     try { localStorage.setItem('showInlineReasoning', v ? '1' : '0'); } catch {}
   };
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([]);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   // Start mock reasoning timer
   const startMockReasoning = useCallback((isFollowUp: boolean) => {
@@ -759,6 +785,8 @@ export function ResearchChat() {
   const [creatingNewChat, setCreatingNewChat] = useState(false);
   const [showContextTooltip, setShowContextTooltip] = useState(false);
   const contextTooltipRef = useRef<HTMLDivElement | null>(null);
+  const [showRefineTooltip, setShowRefineTooltip] = useState(false);
+  const refineButtonRef = useRef<HTMLButtonElement | null>(null);
   const suggestions = useMemo(
     () => generateSuggestions(userProfile, customCriteria, signalPreferences),
     [userProfile, customCriteria, signalPreferences]
@@ -782,7 +810,17 @@ export function ResearchChat() {
         prompt: `Show companies with ${criticalCriteria.join(', ')} signals in the last 90 days`,
       });
     }
-    const signalTypes = signalPreferences.map((s: any) => s?.signal_type).filter(Boolean);
+    const signalTypes = signalPreferences
+      .map((s: any) => {
+        if (!s) return null;
+        if (typeof s?.display_label === 'string' && s.display_label.trim().length > 0) {
+          return s.display_label.trim();
+        }
+        const slug = typeof s?.signal_type === 'string' ? s.signal_type : '';
+        if (!slug) return null;
+        return slugToTitle(slug);
+      })
+      .filter((value: string | null): value is string => Boolean(value));
     if (signalTypes.length) {
       items.push({
         title: 'Accounts with buying signals',
@@ -911,7 +949,14 @@ export function ResearchChat() {
       .slice(0, 4)
       .map((c: any) => ({ name: c.name, importance: c?.importance || null }));
     const signals = signalPreferences
-      .map((s: any) => (s?.signal_type ? String(s.signal_type).replace(/_/g, ' ') : null))
+      .map((s: any) => {
+        if (typeof s?.display_label === 'string' && s.display_label.trim().length > 0) {
+          return s.display_label.trim();
+        }
+        const slug = typeof s?.signal_type === 'string' ? s.signal_type : '';
+        if (!slug) return null;
+        return slugToTitle(slug);
+      })
       .filter((v: string | null): v is string => Boolean(v))
       .slice(0, 4);
 
@@ -1021,6 +1066,7 @@ export function ResearchChat() {
     return -1;
   }, [messages]);
   const lastAssistantMessage = lastAssistantIndex >= 0 ? messages[lastAssistantIndex] : null;
+  const lastAssistantText = useMemo(() => (lastAssistantMessage?.content || '').trim(), [lastAssistantMessage]);
   const canDraftEmail = !draftEmailPending && !streamingMessage && Boolean((() => {
     const latest = (() => {
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -1089,6 +1135,114 @@ export function ResearchChat() {
     return latest?.message?.id ?? null;
   }, [findLatestResearchAssistant]);
 
+  const generateFollowUpSuggestions = useCallback(async () => {
+    if (followUpLoading) return;
+    if (!lastAssistantText) {
+      setFollowUpSuggestions([]);
+      setFollowUpError(null);
+      addToast({ type: 'info', title: 'Ask a follow-up', description: 'Type a question to continue.' });
+      return;
+    }
+
+    const requestId = followUpRequestRef.current + 1;
+    followUpRequestRef.current = requestId;
+    setFollowUpLoading(true);
+    setFollowUpError(null);
+    setFollowUpSuggestions([]);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
+      const payload = {
+        last_assistant: lastAssistantText,
+        last_user: lastUserMessage?.content || '',
+        applied_context: appliedContext,
+        active_company: currentActionCompany || activeSubject || null,
+      };
+
+      const response = await fetch('/api/ai/followups', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let message = response.statusText;
+        try {
+          const errorPayload = await response.json();
+          if (errorPayload?.error) message = errorPayload.error;
+        } catch {
+          const text = await response.text().catch(() => '');
+          if (text) message = text;
+        }
+        throw new Error(message || 'Could not generate follow-up suggestions.');
+      }
+
+      const data = await response.json();
+      const sanitize = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim().replace(/^['"\s]+|['"\s]+$/g, '');
+        if (!trimmed) return null;
+        const words = trimmed.split(/\s+/);
+        if (words.length < 3 || words.length > 18) return null;
+        if (/[{}/]|suggestions\s*:/i.test(trimmed)) return null;
+        const normalized = trimmed.replace(/^[•*\-\d.\s]+/, '');
+        return normalized.endsWith('?') ? normalized : `${normalized}?`;
+      };
+
+      const cleaned = Array.isArray(data?.suggestions)
+        ? data.suggestions
+            .map(sanitize)
+            .filter((item: string | null): item is string => Boolean(item))
+        : [];
+
+      const unique: string[] = [];
+      cleaned.forEach((question: string) => {
+        if (!unique.some(existing => existing.toLowerCase() === question.toLowerCase())) {
+          unique.push(question);
+        }
+      });
+
+      if (unique.length === 0) {
+        throw new Error('No follow-up suggestions available right now.');
+      }
+
+      if (requestId !== followUpRequestRef.current) {
+        return;
+      }
+      setFollowUpSuggestions(unique.slice(0, 5));
+      setFollowUpError(null);
+    } catch (error: any) {
+      console.error('[follow-up] suggestion generation failed', error);
+      if (requestId === followUpRequestRef.current) {
+        setFollowUpSuggestions([]);
+        setFollowUpError(null);
+        if (error?.message) {
+          console.warn('[follow-up] detail:', error.message);
+        }
+        addToast({ type: 'info', title: 'No suggestions', description: 'No automatic follow-ups right now. Try again after another question.' });
+      }
+    } finally {
+      if (requestId === followUpRequestRef.current) {
+        setFollowUpLoading(false);
+      }
+    }
+  }, [
+    followUpLoading,
+    lastAssistantText,
+    supabase,
+    messages,
+    appliedContext,
+    currentActionCompany,
+    activeSubject,
+    addToast,
+  ]);
+
   useEffect(() => {
     if (user) void loadChats();
   }, [user]);
@@ -1124,7 +1278,7 @@ export function ResearchChat() {
           .order('display_order', { ascending: true }),
         supabase
           .from('user_signal_preferences')
-          .select('id, signal_type, importance')
+          .select('id, signal_type, importance, lookback_days, config')
           .eq('user_id', user.id),
       ]);
 
@@ -1140,7 +1294,13 @@ export function ResearchChat() {
       }
 
       if (signals) {
-        setSignalPreferences(signals as any[]);
+        const mappedSignals = (signals as any[]).map((signal: any) => ({
+          ...signal,
+          display_label: typeof signal?.config?.label === 'string' && signal.config.label.trim().length > 0
+            ? signal.config.label.trim()
+            : slugToTitle(String(signal?.signal_type ?? '')),
+        }));
+        setSignalPreferences(mappedSignals);
       } else {
         setSignalPreferences([]);
       }
@@ -1153,6 +1313,91 @@ useEffect(() => {
   if (!user?.id) return;
   void fetchUserPreferences();
 }, [user?.id, fetchUserPreferences]);
+
+  const signalLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    signalPreferences.forEach((pref: any) => {
+      const slug = typeof pref?.signal_type === 'string' ? pref.signal_type.toLowerCase() : '';
+      if (!slug) return;
+      const label = typeof pref?.display_label === 'string' && pref.display_label.trim().length > 0
+        ? pref.display_label.trim()
+        : slugToTitle(slug);
+      map.set(slug, label);
+    });
+    return map;
+  }, [signalPreferences]);
+
+  const normalizeTerminology = useCallback((markdown: string): string => {
+    if (!markdown) return markdown;
+    let result = markdown;
+
+    signalLabelMap.forEach((label, slug) => {
+      if (!label || !slug) return;
+      const baseLabel = label.trim();
+      const normalizedSlug = slug.trim();
+      if (!normalizedSlug) return;
+
+      const plain = normalizedSlug.replace(/[_-]+/g, ' ');
+      const variants = new Set<string>([
+        normalizedSlug,
+        plain,
+        plain.replace(/\s+/g, '-'),
+        slugToTitle(plain),
+      ]);
+
+      variants.forEach(variant => {
+        if (!variant) return;
+        const regex = new RegExp(`\\b${escapeRegExp(variant)}\\b`, 'gi');
+        result = result.replace(regex, baseLabel);
+      });
+    });
+
+    // Generic cleanup for snake_case tokens (excluding URLs)
+    result = result.replace(/\b(?!https?:\/\/)([A-Za-z]+_[A-Za-z0-9_]+)\b/g, (match) => {
+      const key = match.toLowerCase();
+      if (signalLabelMap.has(key)) {
+        return signalLabelMap.get(key)!;
+      }
+      return slugToTitle(match);
+    });
+
+    // Enforce exact labels inside bold bullet headings like: - **Label** - details
+    try {
+      const lines = result.split(/\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(/^\s*-\s*\*\*([^*]+)\*\*(.*)$/);
+        if (!m) continue;
+        const current = m[1].trim();
+        // Find best matching preferred label for this bold token
+        let replacement: string | null = null;
+        signalLabelMap.forEach((label, slug) => {
+          if (replacement) return; // already found
+          const plain = slug.replace(/[_-]+/g, ' ');
+          const variants = [
+            slug,
+            plain,
+            slugToTitle(plain),
+            slugToTitle(plain).replace(/s\b/i, ''), // singular vs plural
+            label,
+          ].map(v => v.toLowerCase());
+          if (variants.includes(current.toLowerCase())) {
+            replacement = label;
+          }
+        });
+        if (replacement && replacement !== current) {
+          lines[i] = lines[i].replace(`**${m[1]}**`, `**${replacement}**`);
+        }
+      }
+      result = lines.join('\n');
+    } catch {}
+
+    // Remove prompt residue such as headings with instructional parentheses
+    result = result.replace(/^(#{1,3})\s+([^\n]+?)\s*\(([^)]+)\)/gm, (_match, hashes: string, heading: string) => {
+      return `${hashes} ${heading.trim()}`;
+    });
+
+    return result;
+  }, [signalLabelMap]);
 
   const loadSetupSummary = useCallback(async () => {
     setSetupSummaryLoading(true);
@@ -1188,6 +1433,9 @@ useEffect(() => {
         signal_type: signal?.signal_type || '',
         importance: signal?.importance || '',
         lookback_days: signal?.lookback_days,
+        label: typeof signal?.display_label === 'string' && signal.display_label.trim().length > 0
+          ? signal.display_label.trim()
+          : slugToTitle(String(signal?.signal_type ?? '')),
       })).filter(item => item.signal_type.trim().length > 0);
 
       let preferenceRows: Array<{ key: string; value: unknown; source?: string; confidence?: number; updated_at?: string }> = [];
@@ -1270,6 +1518,21 @@ useEffect(() => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingMessage, thinkingEvents]);
+
+  useEffect(() => {
+    if (showRefineTooltip && showRefine) {
+      setShowRefineTooltip(false);
+    }
+  }, [showRefineTooltip, showRefine]);
+
+  useEffect(() => {
+    if (!actionBarVisible) {
+      followUpRequestRef.current += 1;
+      setFollowUpSuggestions([]);
+      setFollowUpError(null);
+      setFollowUpLoading(false);
+    }
+  }, [actionBarVisible]);
 
   // Allow other pages to request opening a specific chat by id
   useEffect(() => {
@@ -1546,53 +1809,28 @@ useEffect(() => {
       updates.last_research_summary = summary.trim();
     }
 
-    const tryUpdate = async (name: string) => {
-      if (!name) return null;
-      const { data, error } = await supabase
-        .from('tracked_accounts')
-        .update(updates)
-        .eq('user_id', user.id)
-        .eq('company_name', name)
-        .select('id');
-      if (error) throw error;
-      if (Array.isArray(data) && data.length > 0) {
-        return data[0];
-      }
-      return null;
-    };
-
     try {
-      const triedNames = new Set<string>();
-      for (const name of [subject, normalizedSubject]) {
-        const trimmed = normalizeCompanyNameForTracking(name);
-        if (!trimmed || triedNames.has(trimmed.toLowerCase())) continue;
-        triedNames.add(trimmed.toLowerCase());
-        const result = await tryUpdate(name);
-        if (result) {
-          return true;
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/accounts/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ action: 'update', company_name: normalizedSubject, updates })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.warn('syncTrackedAccountResearch via API failed', response.status, errorText);
+        return false;
       }
 
-      const { data: accounts } = await supabase
-        .from('tracked_accounts')
-        .select('id, company_name')
-        .eq('user_id', user.id);
-      const matched = (accounts || []).find(row => normalizeCompanyNameForTracking(row?.company_name)?.toLowerCase() === normalizedSubject.toLowerCase());
-      if (matched) {
-        const { error: fallbackError } = await supabase
-          .from('tracked_accounts')
-          .update(updates)
-          .eq('id', matched.id);
-        if (fallbackError) throw fallbackError;
-        return true;
-      }
-      // Not an error - company just isn't tracked yet
-      return false;
+      return true;
     } catch (err) {
-      // Only log actual errors, not "not found" cases
-      if (err && typeof err === 'object' && 'code' in err && err.code !== 'PGRST204') {
-        console.warn('syncTrackedAccountResearch failed', err);
-      }
+      console.warn('syncTrackedAccountResearch failed', err);
       return false;
     }
   }, [supabase, user?.id]);
@@ -1872,37 +2110,25 @@ useEffect(() => {
     const companyName = normalizeCompanyNameForTracking(String(rawCompanyName || ''));
     if (!companyName) return false;
     try {
-      const { data: existing } = await supabase
-        .from('tracked_accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('company_name', companyName)
-        .maybeSingle();
-      if (existing) {
-        await syncTrackedAccountResearch(companyName, lastResearchSummaryRef.current || null);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/accounts/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ action: 'add', companies: [{ company_name: companyName }] })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.warn('ensureTrackedAccount via API failed', response.status, errorText);
         return false;
       }
-      const { data: fallbackAccounts } = await supabase
-        .from('tracked_accounts')
-        .select('id, company_name')
-        .eq('user_id', user.id);
-      const fuzzyMatch = (fallbackAccounts || []).find(row => normalizeCompanyNameForTracking(row?.company_name)?.toLowerCase() === companyName.toLowerCase());
-      if (fuzzyMatch) {
-        await syncTrackedAccountResearch(fuzzyMatch.company_name || companyName, lastResearchSummaryRef.current || null);
-        return false;
-      }
-      const { error } = await supabase
-        .from('tracked_accounts')
-        .insert({
-          user_id: user.id,
-          company_name: companyName,
-          monitoring_enabled: true,
-          priority: 'standard',
-          last_researched_at: new Date().toISOString(),
-        });
-      if (error) throw error;
+
       await syncTrackedAccountResearch(companyName, lastResearchSummaryRef.current || null);
-      // Notify listeners to refresh tracked lists
       window.dispatchEvent(new CustomEvent('accounts-updated'));
       return true;
     } catch (e) {
@@ -2159,6 +2385,7 @@ useEffect(() => {
   ) => {
     if (!text.trim() || loading) return;
     const normalized = text.trim();
+    const outboundMessage = augmentForTrackedAccountRefresh(normalized);
     const now = Date.now();
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     
@@ -2201,6 +2428,9 @@ useEffect(() => {
     setActionBarVisible(false);
     setActionBarCompany(null);
     assistantInsertedRef.current = false;
+    setFollowUpSuggestions([]);
+    setFollowUpError(null);
+    followUpRequestRef.current += 1;
 
     const tempUser: Message = {
       id: `temp-${Date.now()}`,
@@ -2385,11 +2615,12 @@ useEffect(() => {
         .select()
         .single();
 
-      let assistant = await streamAIResponse(text, chatId, { overrideDepth: runModeOverride });
+      let assistant = await streamAIResponse(outboundMessage, chatId, { overrideDepth: runModeOverride });
       const usedDepth = (runModeOverride || preferredResearchType || 'deep') as 'deep'|'quick'|'specific';
       // Minimal processing - only strip LLM artifacts, let Streamdown handle markdown
       // NO normalizeMarkdown - it conflicts with Streamdown's parser
       assistant = stripClarifierBlocks(assistant);
+      assistant = normalizeTerminology(assistant);
 
       // Persist any save_profile commands returned by the agent
       await processSaveCommands(assistant);
@@ -2659,6 +2890,21 @@ useEffect(() => {
       console.error('Failed to persist preference:', err);
     }
   };
+
+
+  const handleFollowUpSuggestion = useCallback(async (suggestion: string) => {
+    if (!suggestion || !currentChatId) return;
+    setFollowUpSuggestions(prev => prev.filter(item => item !== suggestion));
+    setFollowUpError(null);
+    setInputValue('');
+    try {
+      await handleSendMessageWithChat(currentChatId, suggestion, 'specific', { force: true });
+    } catch (error) {
+      console.error('[follow-up] failed to send suggestion', error);
+      setInputValue(suggestion);
+      addToast({ type: 'error', title: 'Could not send follow-up', description: 'Press Enter to try again.' });
+    }
+  }, [currentChatId, handleSendMessageWithChat, addToast]);
 
   const streamAIResponse = async (
     userMessage: string,
@@ -3560,9 +3806,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
         await handleContinueCompany();
         return;
       case 'follow_up': {
-        addToast({ type: 'info', title: 'Ask a follow-up', description: 'Using quick research mode for focused answers.' });
-        setInputValue(currentActionCompany ? `What follow-up questions should I ask ${currentActionCompany}? ` : 'What follow-up question should I ask? ');
-        setFocusComposerTick(t => t + 1);
+        await generateFollowUpSuggestions();
         return;
       }
       case 'email': {
@@ -3638,7 +3882,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
       default:
         return;
     }
-  }, [handleStartNewCompany, handleContinueCompany, currentActionCompany, addToast, findLatestResearchAssistant, userProfile?.target_titles]);
+  }, [handleStartNewCompany, handleContinueCompany, currentActionCompany, addToast, findLatestResearchAssistant, userProfile?.target_titles, generateFollowUpSuggestions]);
 
   const DRAFT_EMAIL_ENABLED = false; // Disabled - not ready for release
   const shortcutHandlers = useMemo<Record<string, () => void>>(() => {
@@ -3742,6 +3986,15 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
 
   // Look for JSON code blocks with action: save_profile and persist via server
   const processSaveCommands = async (responseText: string) => {
+    // Hard guard: disable agent-initiated profile writes unless explicitly enabled
+    try {
+      if (typeof window !== 'undefined') {
+        const enabled = localStorage.getItem('allow_agent_profile_writes') === '1';
+        if (!enabled) return;
+      } else {
+        return;
+      }
+    } catch {}
     const jsonBlockRegex = /```json\s*\n?([\s\S]*?)\n?```/g;
     const matches = Array.from(responseText.matchAll(jsonBlockRegex));
     for (const match of matches) {
@@ -4472,7 +4725,7 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                       className="inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                       onClick={() => { void handleActionBarAction('follow_up'); }}
                     >
-                      🧠 Follow-up question
+                      🧠 Follow-up questions
                     </button>
                     <button
                       className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 transition-colors ${
@@ -4512,13 +4765,33 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
                       </button>
                     )}
                     {(!lastIsDraftEmail) && (
-                      <button
-                        className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        onClick={() => { void handleActionBarAction('refine'); }}
-                        title="Adjust focus areas (leadership, funding, tech stack, news, competitors, hiring) and timeframe, then re-run."
-                      >
-                        🎯 Refine focus
-                      </button>
+                      <div className="relative inline-flex">
+                        <button
+                          ref={refineButtonRef}
+                          className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                          onMouseEnter={() => setShowRefineTooltip(true)}
+                          onMouseLeave={() => setShowRefineTooltip(false)}
+                          onFocus={() => setShowRefineTooltip(true)}
+                          onBlur={() => setShowRefineTooltip(false)}
+                          onClick={() => {
+                            setShowRefineTooltip(false);
+                            void handleActionBarAction('refine');
+                          }}
+                          aria-describedby={showRefineTooltip ? 'refine-focus-tooltip' : undefined}
+                        >
+                          🎯 Refine focus
+                        </button>
+                        {showRefineTooltip && (
+                          <div
+                            id="refine-focus-tooltip"
+                            role="tooltip"
+                            className="absolute z-20 top-full left-1/2 -translate-x-1/2 mt-2 w-64 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg"
+                          >
+                            Tune which sections to emphasize (leadership, funding, tech stack, news, competitors, hiring)
+                            and rerun without repeating setup.
+                          </div>
+                        )}
+                      </div>
                     )}
                     {/* Get verified emails - disabled, not ready for release
                     {(!lastIsDraftEmail) && (
@@ -4726,6 +4999,65 @@ Limit to 5 bullets total, cite sources inline, and end with one proactive next s
               </div>
             )}
           </div>
+          {(followUpLoading || followUpSuggestions.length > 0 || followUpError) && (
+            <div className="mb-3">
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
+                    <span>🧠 Suggested follow-up questions</span>
+                    {followUpLoading && (
+                      <span className="flex items-center gap-1 text-xs text-indigo-600">
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                        Generating…
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs text-indigo-700 hover:underline"
+                    onClick={() => {
+                      followUpRequestRef.current += 1;
+                      setFollowUpSuggestions([]);
+                      setFollowUpError(null);
+                      setFollowUpLoading(false);
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                {followUpError && (
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-red-700">
+                    <span className="flex-1">{followUpError}</span>
+                    <button
+                      type="button"
+                      disabled={followUpLoading}
+                      className="text-red-700 underline-offset-2 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+                      onClick={() => { if (!followUpLoading) void generateFollowUpSuggestions(); }}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+                {followUpSuggestions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {followUpSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={`${suggestion}-${idx}`}
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 transition-colors hover:border-indigo-400 hover:bg-indigo-100"
+                        onClick={() => { void handleFollowUpSuggestion(suggestion); }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {followUpLoading && followUpSuggestions.length === 0 && !followUpError && (
+                  <div className="mt-3 text-xs text-indigo-700">Gathering ideas…</div>
+                )}
+              </div>
+            </div>
+          )}
           <MessageInput
             value={inputValue}
             onChange={setInputValue}

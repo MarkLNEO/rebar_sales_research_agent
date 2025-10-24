@@ -6,6 +6,7 @@
  */
 
 import type { PreferenceUpsert } from './store';
+import { supabase } from '@/src/lib/supabase';
 
 export type UserInteraction = 
   | { type: 'section_expanded'; section: string; chatId: string }
@@ -241,7 +242,7 @@ class PreferenceTracker {
       }
 
       // Save via API
-      const authToken = this.getAuthToken();
+      const authToken = await this.getAuthToken();
       if (!authToken) {
         console.warn('[PreferenceTracker] No auth token, cannot save preferences');
         return;
@@ -270,29 +271,43 @@ class PreferenceTracker {
   /**
    * Get auth token from localStorage or cookies
    */
-  private getAuthToken(): string | null {
+  private async getAuthToken(): Promise<string | null> {
     if (typeof window === 'undefined') return null;
-    
-    // Try localStorage first
+
     try {
-      const token = localStorage.getItem('supabase.auth.token');
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
       if (token) {
-        const parsed = JSON.parse(token);
-        return parsed.access_token || parsed;
+        return token;
       }
-    } catch (e) {
-      // Ignore
+    } catch (error) {
+      console.warn('[PreferenceTracker] Failed to retrieve session for auth token', error);
     }
 
-    // Try getting from Supabase client
     try {
-      const supabaseSession = localStorage.getItem('sb-localhost-auth-token');
-      if (supabaseSession) {
-        const parsed = JSON.parse(supabaseSession);
-        return parsed.access_token;
+      const stored = localStorage.getItem('supabase.auth.token');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (typeof parsed === 'string') return parsed;
+        if (parsed?.access_token) return parsed.access_token;
       }
-    } catch (e) {
-      // Ignore
+    } catch {
+      // Ignore JSON parse errors
+    }
+
+    try {
+      const match = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
+      const projectRef = match ? match[1] : null;
+      if (projectRef) {
+        const key = `sb-${projectRef}-auth-token`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.access_token) return parsed.access_token;
+        }
+      }
+    } catch {
+      // Ignore JSON parse errors
     }
 
     return null;

@@ -724,7 +724,14 @@ These time-sensitive events create urgency (actively monitor):
 
 `;
     signals.forEach((s: any, i: number) => {
-      prompt += `${i + 1}. **${s.signal_type}** (${s.importance})
+      const labelExact = (s.display_label || s.label || '').toString().trim();
+      const humanized = (s.signal_type || '')
+        .toString()
+        .split('_')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      const displayName = labelExact || humanized;
+      prompt += `${i + 1}. **${displayName}** (${s.importance})
    - Lookback: ${s.lookback_days} days
    - Search specifically for this signal
 `;
@@ -739,14 +746,16 @@ These time-sensitive events create urgency (actively monitor):
 **CRITICAL OUTPUT REQUIREMENT - ${signalTerm.toUpperCase()} FORMAT**:
 You MUST include a "${signalTerm}" section in EVERY report showing findings for each configured signal type.
 
-REQUIRED FORMAT (use these exact signal type names - already formatted for display):
+REQUIRED FORMAT (use these exact labels VERBATIM if provided by the user; otherwise humanize):
 ## ${signalTerm}
 ${signals.map((s: any) => {
-  // Humanize underscore-separated signal types for display
-  const displayName = s.signal_type
+  const labelExact = (s.display_label || s.label || '').toString().trim();
+  const humanized = (s.signal_type || '')
+    .toString()
     .split('_')
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+  const displayName = labelExact || humanized;
   return `- **${displayName}** - [Your specific findings with brief context, dates, and impact]`;
 }).join('\n')}
 
@@ -759,10 +768,10 @@ WRONG (too vague):
 - **Data breach**: Found some activity
 - **Leadership change**: See recent news
 
-If no activity found for a signal type, still list it with the humanized name:
-- **[Humanized Signal Name]** - No recent activity detected (last ${signals[0]?.lookback_days || 90} days)
+If no activity found for a signal type, still list it with the exact label if provided (fallback to humanized name):
+- **[Exact Label or Humanized Name]** - No recent activity detected (last ${signals[0]?.lookback_days || 90} days)
 
-IMPORTANT: Use the humanized signal type names provided above (Title Case with spaces). These are already formatted for user display.
+IMPORTANT: Use the exact labels if present (display_label/label). Do NOT invent or add underscores. If no label provided, humanize the name (Title Case with spaces) and avoid underscores.
 </buying_signals>`;
   }
 

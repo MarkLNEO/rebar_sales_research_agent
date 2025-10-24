@@ -34,7 +34,7 @@ export interface TrackedAccount {
   monitoring_enabled: boolean;
   latest_research_id?: string;
   icp_fit_score?: number;
-  signal_score: number;
+  signal_score?: number | null;
   priority: 'hot' | 'warm' | 'standard';
   last_contacted_at?: string;
   notes?: string;

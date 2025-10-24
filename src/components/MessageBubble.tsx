@@ -497,14 +497,27 @@ export function MessageBubble({
 
   const nextActions = useMemo(() => {
     const source = safeContent || '';
-    const sectionMatch = source.match(/##\s+(Next Actions?|Next Steps?|Proactive Follow-ups)[\s\S]*?(?=\n##\s+|$)/i);
-    if (!sectionMatch) return [] as string[];
-    const lines = sectionMatch[0].split(/\n+/).slice(1); // skip heading
-    const actions = lines
-      .map(line => line.replace(/^[-*•\d.)\s]+/, '').trim())
-      .filter(text => text.length > 0 && text.length <= 140 && !/^none\s+found\.?$/i.test(text) && !/^unknown\b/i.test(text))
-    const unique = Array.from(new Set(actions));
-    return unique.slice(0, 6);
+    const match = source.match(/##\s+(Next Actions?|Next Steps?|Proactive Follow-ups)[\s\S]*?(?=\n##\s+|$)/i);
+    if (!match) return [] as string[];
+
+    const rawLines = match[0].split(/\n+/).slice(1); // drop heading
+
+    const stripMd = (s: string) => s.replace(/\*\*|`/g, '').replace(/\[(.*?)\]\([^)]*\)/g, '$1');
+    const startsWithVerb = (s: string) => /^(draft|send|write|compose|propose|schedule|run|pull|get|contact|reach|follow|monitor|set|add|create|build|offer|review|refine|summarize|research|investigate|prepare|validate|ship|launch|email|call|meet|align|escalate|track|export|share)\b/i.test(s);
+    const hasTimeframe = (s: string) => /(today|tomorrow|this\s+week|within\s+\d+\s*(?:day|week)s?|\bq[1-4]\b|\d+\s*(?:day|week)s)/i.test(s);
+    const isJunk = (s: string) => /^(who:|why:|message angle:|deliverable:|marketing|co-?selling|play\b)/i.test(s);
+
+    const cleaned = rawLines
+      .map(line => stripMd(line).replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(text => text.length >= 6 && text.length <= 120)
+      .filter(text => !/^none\s+found\.?$/i.test(text) && !/^unknown\b/i.test(text))
+      .filter(text => !isJunk(text))
+      .filter(text => startsWithVerb(text) || hasTimeframe(text));
+
+    const unique = Array.from(new Set(cleaned.map(s => s.replace(/\s+/g, ' ').trim())));
+    const top = unique.slice(0, 3);
+    // Hide the whole block if nothing truly actionable
+    return top;
   }, [safeContent]);
 
   // Extract company name from research content if applicable

@@ -11,9 +11,10 @@ import { stripClarifierBlocks } from '../utils/markdown';
 import { MessageInput } from '../components/MessageInput';
 import { ProfileCompleteness } from '../components/ProfileCompleteness';
 import { ThinkingIndicator } from '../components/ThinkingIndicator';
-import { ArrowLeft, User, ChevronDown, ClipboardList } from 'lucide-react';
+import { ArrowLeft, User, ChevronDown, ClipboardList, Sparkles, Check, X } from 'lucide-react';
 import type { TrackedAccount } from '../services/accountService';
 import { invalidateUserProfileCache } from '../hooks/useUserProfile';
+import { slugToTitle } from '../utils/string';
 
 const DEFAULT_PROMPT_CONFIG = {
   preferred_research_type: null as 'quick' | 'deep' | 'specific' | null,
@@ -37,6 +38,24 @@ const stripSaveProfileBlocks = (text: string): string => {
   cleaned = cleaned.replace(/\{\s*"action"\s*:\s*"save_profile"[\s\S]*$/gi, '');
 
   return cleaned.trim();
+};
+
+const sanitizeAssistantText = (text: string): string => {
+  if (!text) return text;
+  let cleaned = stripSaveProfileBlocks(text);
+  // Aggressive normalization of snake_case tokens that sometimes slip through
+  cleaned = cleaned
+    .replace(/\bfunding_announcement\b/gi, 'Funding Announcement')
+    .replace(/\bproduct_launch\b/gi, 'Product Launch')
+    .replace(/\bdata_breach\b/gi, 'Data Breach')
+    .replace(/\bleadership_change\b/gi, 'Leadership Change')
+    .replace(/\bsave_profile\b/gi, 'Save Profile');
+  // Drop meta commentary that confuses users
+  cleaned = cleaned
+    .split(/\n+/)
+    .filter(line => !/snake_case|map the user's language verbatim|save_profile\b/i.test(line))
+    .join('\n');
+  return normalizeUnderscoreTokens(cleaned);
 };
 
 type SaveProfilePayload = {
@@ -127,6 +146,27 @@ const extractSavePayloads = (raw: string): SaveProfilePayload[] => {
   return payloads;
 };
 
+const humanizeToken = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/[_-]/.test(trimmed)) {
+    return slugToTitle(trimmed);
+  }
+  return trimmed.replace(/\s+/g, ' ').trim();
+};
+
+const humanizeList = (items: unknown[]): string => {
+  return items
+    .map(item => humanizeToken(item))
+    .filter((token): token is string => token.length > 0)
+    .join(', ');
+};
+
+const normalizeUnderscoreTokens = (text: string): string => {
+  return text.replace(/\b([a-z0-9]+(?:[_-][a-z0-9]+)+)\b/gi, token => slugToTitle(token));
+};
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -142,10 +182,92 @@ interface Chat {
 
 interface ThinkingEvent {
   id: string;
-  type: 'reasoning' | 'web_search';
+  type: 'reasoning' | 'web_search' | 'status' | 'acknowledgment' | 'reasoning_progress';
   content?: string;
   query?: string;
   sources?: string[];
+}
+
+type PendingSaveSuggestion = {
+  id: string;
+  key: string;
+  payload: SaveProfilePayload;
+  summaryItems: string[];
+};
+
+const MOCK_PROFILE_INITIAL_STEPS = [
+  'Reviewing your saved profile...',
+  'Scanning ICP focus and industry coverage...',
+  'Checking signal coverage for gaps...',
+  'Spotting criteria you might be missing...',
+  'Comparing tracked accounts vs. research cadence...',
+  'Evaluating follow-up defaults and tone...',
+  'Looking for conflicting preferences...',
+  'Cross-referencing recent research runs...',
+  'Assessing priority weighting on signals...',
+];
+
+const MOCK_PROFILE_FOLLOWUP_STEPS = [
+  'Re-reading the latest suggestion...',
+  'Checking which sections the update touches...',
+  'Validating terminology against your saved profile...',
+  'Making sure signal weights stay balanced...',
+  'Confirming tracked accounts reflect this change...',
+  'Ensuring criteria ordering still makes sense...',
+  'Evaluating how this affects follow-up prompts...',
+  'Aligning the tone with your preferred style...',
+];
+
+function generateMockProfileSequence(context: 'initial' | 'followup'): string[] {
+  const pool = context === 'initial' ? MOCK_PROFILE_INITIAL_STEPS : MOCK_PROFILE_FOLLOWUP_STEPS;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  const count = Math.min(pool.length, Math.max(4, Math.floor(Math.random() * 4) + 5));
+  return shuffled.slice(0, count);
+}
+
+function extractSummaryItems(payload: SaveProfilePayload): string[] {
+  const summary: string[] = [];
+
+  if (payload.profile?.company_name) {
+    summary.push(`Company → ${humanizeToken(payload.profile.company_name)}`);
+  }
+  if (payload.profile?.industry) {
+    summary.push(`Industry → ${humanizeToken(payload.profile.industry)}`);
+  }
+  const indicatorLabel = payload.profile?.preferred_terms?.indicators_label;
+  if (typeof indicatorLabel === 'string' && indicatorLabel.trim()) {
+    summary.push(`Signals label → ${humanizeToken(indicatorLabel)}`);
+  }
+  if (Array.isArray(payload.profile?.indicator_choices) && payload.profile.indicator_choices.length > 0) {
+    const list = humanizeList(payload.profile.indicator_choices);
+    if (list) summary.push(`Watchlist → ${list}`);
+  }
+  if (Array.isArray(payload.profile?.target_titles) && payload.profile.target_titles.length > 0) {
+    const titles = humanizeList(payload.profile.target_titles);
+    if (titles) summary.push(`Target titles → ${titles}`);
+  }
+  if (Array.isArray(payload.signal_preferences) && payload.signal_preferences.length > 0) {
+    const signals = payload.signal_preferences
+      .map((pref: any) => humanizeToken(pref?.display_label || pref?.signal_type))
+      .filter(Boolean);
+    const list = signals.join(', ');
+    if (list) summary.push(`Signal alerts → ${list}`);
+  }
+  if (Array.isArray(payload.custom_criteria) && payload.custom_criteria.length > 0) {
+    const criteria = payload.custom_criteria
+      .map((criterion: any) => humanizeToken(criterion?.field_name || criterion?.name))
+      .filter(Boolean)
+      .join(', ');
+    if (criteria) summary.push(`Custom criteria → ${criteria}`);
+  }
+  if (Array.isArray(payload.disqualifying_criteria) && payload.disqualifying_criteria.length > 0) {
+    const disqualifiers = payload.disqualifying_criteria
+      .map((criterion: any) => humanizeToken(criterion?.criterion))
+      .filter(Boolean)
+      .join(', ');
+    if (disqualifiers) summary.push(`Disqualifiers → ${disqualifiers}`);
+  }
+  return summary;
 }
 
 export function CompanyProfile() {
@@ -169,16 +291,130 @@ export function CompanyProfile() {
   const [streamingMessage, setStreamingMessage] = useState('');
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [thinkingEvents, setThinkingEvents] = useState<ThinkingEvent[]>([]);
+  const [pendingSaveSuggestions, setPendingSaveSuggestions] = useState<PendingSaveSuggestion[]>([]);
+  const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
+  const [mockReasoningElapsed, setMockReasoningElapsed] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
   const isMountedRef = useRef(true);
   const [savedPreferences, setSavedPreferences] = useState<Array<{ key: string; value: any; source?: string; confidence?: number; updated_at?: string }>>([]);
   const [prefsLoading, setPrefsLoading] = useState(false);
+  const mockReasoningTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mockReasoningStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mockReasoningTimerRef.current) {
+        clearInterval(mockReasoningTimerRef.current);
+        mockReasoningTimerRef.current = null;
+      }
+      mockReasoningStartTimeRef.current = null;
+    };
+  }, []);
+
+  const startMockReasoning = useCallback((context: 'initial' | 'followup' = 'initial') => {
+    if (mockReasoningTimerRef.current) {
+      clearInterval(mockReasoningTimerRef.current);
+      mockReasoningTimerRef.current = null;
+    }
+
+    const steps = generateMockProfileSequence(context);
+    if (steps.length === 0) return;
+
+    mockReasoningStartTimeRef.current = Date.now();
+    setMockReasoningElapsed(0);
+
+    setThinkingEvents(prev => {
+      const filtered = prev.filter(event => event.type !== 'status');
+      return [
+        ...filtered,
+        {
+          id: `status-${Date.now()}`,
+          type: 'status',
+          content: steps[0],
+        },
+      ];
+    });
+
+    let stepIndex = 1;
+    let nextStepAt = 3 + Math.floor(Math.random() * 3); // 3-5 seconds
+
+    mockReasoningTimerRef.current = setInterval(() => {
+      if (!mockReasoningStartTimeRef.current) return;
+
+      const elapsed = Math.floor((Date.now() - mockReasoningStartTimeRef.current) / 1000);
+      setMockReasoningElapsed(elapsed);
+
+      if (elapsed >= 60) {
+        if (mockReasoningTimerRef.current) {
+          clearInterval(mockReasoningTimerRef.current);
+          mockReasoningTimerRef.current = null;
+        }
+        mockReasoningStartTimeRef.current = null;
+        return;
+      }
+
+      if (elapsed >= nextStepAt && stepIndex < steps.length) {
+        const nextContent = steps[stepIndex++];
+        setThinkingEvents(prev => {
+          const filtered = prev.filter(event => event.type !== 'status');
+          return [
+            ...filtered,
+            {
+              id: `status-${Date.now()}`,
+              type: 'status',
+              content: nextContent,
+            },
+          ];
+        });
+        nextStepAt = elapsed + 3 + Math.floor(Math.random() * 4); // 3-6 seconds
+      }
+    }, 250);
+  }, []);
+
+  const stopMockReasoning = useCallback(() => {
+    if (mockReasoningTimerRef.current) {
+      clearInterval(mockReasoningTimerRef.current);
+      mockReasoningTimerRef.current = null;
+    }
+    mockReasoningStartTimeRef.current = null;
+    setMockReasoningElapsed(0);
+  }, []);
+
+  const queuePendingSave = useCallback((payload: SaveProfilePayload) => {
+    const key = JSON.stringify(payload || {});
+    const summaryItems = extractSummaryItems(payload);
+    setPendingSaveSuggestions(prev => {
+      if (prev.some(item => item.key === key)) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: `pending-save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          key,
+          payload,
+          summaryItems,
+        },
+      ];
+    });
+    addToast({
+      type: 'info',
+      title: 'Profile update ready',
+      description: summaryItems.length > 0
+        ? summaryItems.join('; ')
+        : 'Review and apply the suggested profile change.',
+    });
+  }, [addToast]);
+
+  const handleDismissPendingSave = useCallback((id: string) => {
+    setPendingSaveSuggestions(prev => prev.filter(item => item.id !== id));
   }, []);
 
   const preferenceSummary = useMemo(() => {
@@ -525,7 +761,7 @@ export function CompanyProfile() {
     []
   );
 
-  const refreshProfileData = async () => {
+  const refreshProfileData = useCallback(async () => {
     if (!user) return null;
 
     const [profileResult, criteriaResult, signalsResult, promptConfigResult] = await Promise.all([
@@ -567,13 +803,13 @@ export function CompanyProfile() {
       always_tldr: typeof prompt.always_tldr === 'boolean' ? prompt.always_tldr : true,
     });
     return profile;
-  };
+  }, [supabase, user]);
 
   useEffect(() => {
     if (user) {
-      initializeProfilePage();
+      void initializeProfilePage();
     }
-  }, [user]);
+  });
 
   useEffect(() => {
     if (currentChatId) {
@@ -581,6 +817,10 @@ export function CompanyProfile() {
     } else {
       setMessages([]);
     }
+  }, [currentChatId]);
+
+  useEffect(() => {
+    setPendingSaveSuggestions([]);
   }, [currentChatId]);
 
   const refreshPreferences = useCallback(async () => {
@@ -613,11 +853,101 @@ export function CompanyProfile() {
     } finally {
       if (isMountedRef.current) setPrefsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     void refreshPreferences();
   }, [refreshPreferences]);
+
+  const applySavePayload = useCallback(async (payload: SaveProfilePayload): Promise<{ confirmation: string; summaryItems: string[] }> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Session expired. Please sign in again.');
+    }
+
+    const response = await fetch('/api/profiles/update', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        apikey: `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        profile: payload.profile,
+        custom_criteria: payload.custom_criteria,
+        signal_preferences: payload.signal_preferences,
+        disqualifying_criteria: payload.disqualifying_criteria,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => 'Unknown error');
+      throw new Error(errText || 'Profile save failed');
+    }
+
+    await refreshProfileData();
+    await refreshPreferences();
+    invalidateUserProfileCache(user?.id);
+    try {
+      window.dispatchEvent(new CustomEvent('profile:updated', { detail: { userId: user?.id } }));
+    } catch {}
+
+    const summaryItems = extractSummaryItems(payload);
+    const confirmation = summaryItems.length > 0
+      ? `All set — I captured: ${summaryItems.join('; ')}.`
+      : 'Saved your latest profile updates.';
+
+    return { confirmation, summaryItems };
+  }, [refreshProfileData, refreshPreferences, user?.id]);
+
+  const handleApplyPendingSave = useCallback(async (id: string) => {
+    const suggestion = pendingSaveSuggestions.find(item => item.id === id);
+    if (!suggestion) return;
+    setApplyingSuggestionId(id);
+
+    try {
+      const result = await applySavePayload(suggestion.payload);
+      addToast({
+        type: 'success',
+        title: 'Profile updated',
+        description: result.summaryItems.length > 0
+          ? result.summaryItems.join('; ')
+          : 'Preferences saved successfully.',
+      });
+
+      if (currentChatId) {
+        const { data: savedAssistantMsg } = await supabase
+          .from('messages')
+          .insert({
+            chat_id: currentChatId,
+            role: 'assistant',
+            content: result.confirmation,
+          })
+          .select()
+          .single();
+
+        if (savedAssistantMsg) {
+          setMessages(prev => [...prev, savedAssistantMsg]);
+        }
+
+        await supabase
+          .from('chats')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', currentChatId);
+      }
+
+      setPendingSaveSuggestions(prev => prev.filter(item => item.id !== id));
+    } catch (error: any) {
+      console.error('Failed to apply profile update', error);
+      addToast({
+        type: 'error',
+        title: 'Profile update failed',
+        description: error?.message || 'Unable to apply this update. Please try again.',
+      });
+    } finally {
+      setApplyingSuggestionId(null);
+    }
+  }, [pendingSaveSuggestions, applySavePayload, addToast, currentChatId, setMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -746,8 +1076,9 @@ export function CompanyProfile() {
     // Show immediate acknowledgment so the UI isn't blank
     setThinkingEvents(prev => ([
       ...prev,
-      { id: 'ack-initial', type: 'acknowledgment' as any, content: "Got it — I'll review your profile and suggest 1–2 high‑impact improvements." }
+      { id: 'ack-initial', type: 'acknowledgment', content: "Got it — I'll review your profile and suggest 1–2 high‑impact improvements." }
     ]));
+    startMockReasoning('initial');
 
     const userName = getUserName();
     let systemPrompt = '';
@@ -803,16 +1134,17 @@ Onboarding flow:
       let fullResponse = await streamAIResponse(systemPrompt, chatId, true);
       // Only strip LLM artifacts, let Streamdown handle markdown parsing
       fullResponse = stripClarifierBlocks(fullResponse);
-      const saveConfirmation = await processSaveCommands(fullResponse);
+      const saveConfirmation = await processSaveCommands(fullResponse, 'assistant');
       let displayResponse = (() => {
-        const stripped = stripSaveProfileBlocks(fullResponse).trim();
-        return stripped.length > 0 ? stripped : fullResponse;
+        const stripped = sanitizeAssistantText(fullResponse).trim();
+        return stripped.length > 0 ? stripped : sanitizeAssistantText(fullResponse);
       })();
       if (saveConfirmation) {
         displayResponse = displayResponse
           ? `${displayResponse}\n\n${saveConfirmation}`
           : saveConfirmation;
       }
+      displayResponse = displayResponse.replace(/Saved (?:this|these) updates? to your profile/gi, 'Captured updates for your profile (review before applying)');
 
       // Persist streamed message after completion
       const { data: savedAssistantMsg } = await supabase
@@ -836,6 +1168,9 @@ Onboarding flow:
       addToast({ type: 'error', title: 'Failed to initialize', description: 'Could not start the Profile Coach. Please try again.' });
     } finally {
       setLoading(false);
+      stopMockReasoning();
+      setThinkingEvents(prev => prev.filter(event => event.type !== 'status'));
+      setMockReasoningElapsed(0);
     }
   };
 
@@ -865,6 +1200,7 @@ Onboarding flow:
     setMessages(prev => [...prev, tempUserMsg]);
     setStreamingMessage('');
     setThinkingEvents([]);
+    startMockReasoning('followup');
 
     try {
       const { data: savedUserMsg } = await supabase
@@ -877,7 +1213,7 @@ Onboarding flow:
         .select()
         .single();
 
-      const manualConfirmation = await processSaveCommands(userMessage);
+      const manualConfirmation = await processSaveCommands(userMessage, 'user');
       if (manualConfirmation) {
         const { data: savedAssistantMsg } = await supabase
           .from('messages')
@@ -897,11 +1233,13 @@ Onboarding flow:
         setThinkingEvents([]);
         await supabase
           .from('chats')
-          .update({
-            updated_at: new Date().toISOString(),
-            title: messages.length === 0 ? userMessage.slice(0, 60) : undefined
-          })
+            .update({
+              updated_at: new Date().toISOString(),
+              title: messages.length === 0 ? userMessage.slice(0, 60) : undefined
+            })
           .eq('id', currentChatId);
+        stopMockReasoning();
+        setMockReasoningElapsed(0);
         setLoading(false);
         return;
       }
@@ -911,11 +1249,11 @@ Onboarding flow:
       fullResponse = stripClarifierBlocks(fullResponse);
 
       // Check if response contains profile save command
-      const saveConfirmation = await processSaveCommands(fullResponse);
+      const saveConfirmation = await processSaveCommands(fullResponse, 'assistant');
 
       let displayResponse = (() => {
-        const stripped = stripSaveProfileBlocks(fullResponse).trim();
-        return stripped.length > 0 ? stripped : fullResponse;
+        const stripped = sanitizeAssistantText(fullResponse).trim();
+        return stripped.length > 0 ? stripped : sanitizeAssistantText(fullResponse);
       })();
 
       if (saveConfirmation) {
@@ -923,6 +1261,7 @@ Onboarding flow:
           ? `${displayResponse}\n\n${saveConfirmation}`
           : saveConfirmation;
       }
+      displayResponse = displayResponse.replace(/Saved (?:this|these) updates? to your profile/gi, 'Captured updates for your profile (review before applying)');
 
       const { data: savedAssistantMsg } = await supabase
         .from('messages')
@@ -963,6 +1302,9 @@ Onboarding flow:
       setThinkingEvents([]);
     } finally {
       setLoading(false);
+      stopMockReasoning();
+      setThinkingEvents(prev => prev.filter(event => event.type !== 'status'));
+      setMockReasoningElapsed(0);
     }
   };
 
@@ -1069,7 +1411,7 @@ Onboarding flow:
                 if (parsed.type === 'acknowledgment') {
                   setThinkingEvents(prev => {
                     const others = prev.filter(e => e.id !== 'ack-live');
-                    return [...others, { id: 'ack-live', type: 'acknowledgment' as any, content: parsed.content }];
+                    return [...others, { id: 'ack-live', type: 'acknowledgment', content: parsed.content }];
                   });
                 }
                 // Handle reasoning events - accumulate deltas into a single event
@@ -1108,6 +1450,21 @@ Onboarding flow:
                       sources: parsed.sources || []
                     }];
                   });
+                }
+                else if (parsed.type === 'status') {
+                  if (parsed.content) {
+                    setThinkingEvents(prev => {
+                      const filtered = prev.filter(e => e.type !== 'status');
+                      return [
+                        ...filtered,
+                        {
+                          id: `status-${Date.now()}`,
+                          type: 'status',
+                          content: parsed.content,
+                        },
+                      ];
+                    });
+                  }
                 }
                 else if (parsed.type === 'preference_saved') {
                   if (Array.isArray(parsed.preferences) && parsed.preferences.length) {
@@ -1169,11 +1526,14 @@ Onboarding flow:
                   if (content) {
                     if (!startedOutput) {
                       startedOutput = true;
-                      // Remove any acknowledgment banners once streaming starts
-                      setThinkingEvents(prev => prev.filter(e => !['ack-initial','ack-live'].includes(e.id)));
+                      // Remove any acknowledgment banners and mock statuses once streaming starts
+                      setThinkingEvents(prev => prev.filter(e =>
+                        !['ack-initial', 'ack-live'].includes(e.id) && e.type !== 'status'
+                      ));
+                      stopMockReasoning();
                     }
                     fullText += content;
-                    setStreamingMessage(stripSaveProfileBlocks(fullText));
+                    setStreamingMessage(sanitizeAssistantText(fullText));
                     if (firstDeltaAt == null) {
                       firstDeltaAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
                       try { window.dispatchEvent(new CustomEvent('llm:first-delta', { detail: { page: 'settings', ttfbMs: firstDeltaAt - startedAt } })); } catch {}
@@ -1188,7 +1548,7 @@ Onboarding flow:
                 else if (parsed.choices?.[0]?.delta?.content) {
                   const content = parsed.choices[0].delta.content;
                   fullText += content;
-                  setStreamingMessage(stripSaveProfileBlocks(fullText));
+                  setStreamingMessage(sanitizeAssistantText(fullText));
                 }
               } catch (_e) {
                 // Skip invalid JSON
@@ -1235,103 +1595,47 @@ Onboarding flow:
     return 'there';
   };
 
-  const processSaveCommands = async (responseText: string): Promise<string | null> => {
+  const processSaveCommands = async (responseText: string, origin: 'assistant' | 'user'): Promise<string | null> => {
     const payloads = extractSavePayloads(responseText);
     if (payloads.length === 0) return null;
 
     const confirmations: string[] = [];
 
     for (const payload of payloads) {
+      if (payload.action !== 'save_profile') continue;
+
+      if (origin === 'assistant') {
+        // Do not queue auto-updates unless explicitly enabled by a local flag
+        try {
+          if (typeof window !== 'undefined') {
+            const allow = localStorage.getItem('allow_assistant_profile_suggestions') === '1';
+            if (!allow) {
+              // Skip creating a pending card; surface no confirmation text
+              continue;
+            }
+          }
+        } catch {}
+        queuePendingSave(payload);
+        continue;
+      }
+
       try {
-        if (payload.action === 'save_profile') {
-          console.log('Found save_profile command, executing...');
-
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            console.error('No session found');
-            continue;
-          }
-
-          // Route profile updates through Vercel API proxy
-          const updateProfileUrl = '/api/profiles/update';
-
-          const response = await fetch(updateProfileUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-              'apikey': `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              profile: payload.profile,
-              custom_criteria: payload.custom_criteria,
-              signal_preferences: payload.signal_preferences,
-              disqualifying_criteria: payload.disqualifying_criteria
-            }),
-          });
-
-          if (!response.ok) {
-            const errText = await response.text().catch(() => 'Unknown error');
-            console.error('Failed to save profile:', errText);
-            addToast({ type: 'error', title: 'Profile save failed', description: String(errText).slice(0, 240) });
-          } else {
-            const result = await response.json();
-            console.log('Profile saved successfully:', result);
-            await refreshProfileData();
-            await refreshPreferences();
-            window.dispatchEvent(new CustomEvent('profile:updated', { detail: { userId: user?.id } }));
-            addToast({ type: 'success', title: 'Profile updated', description: 'Your preferences were saved.' });
-
-            const savedBits: string[] = [];
-            if (payload.profile?.company_name) {
-              savedBits.push(`Company → ${payload.profile.company_name}`);
-            }
-            if (payload.profile?.industry) {
-              savedBits.push(`Industry → ${payload.profile.industry}`);
-            }
-            const indicatorLabel = payload.profile?.preferred_terms?.indicators_label;
-            if (typeof indicatorLabel === 'string' && indicatorLabel.trim()) {
-              savedBits.push(`Signals label → ${indicatorLabel.trim()}`);
-            }
-            if (Array.isArray(payload.profile?.indicator_choices) && payload.profile.indicator_choices.length > 0) {
-              const list = payload.profile.indicator_choices
-                .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
-                .filter(Boolean)
-                .join(', ');
-              if (list) savedBits.push(`Watchlist → ${list}`);
-            }
-            if (Array.isArray(payload.profile?.target_titles) && payload.profile.target_titles.length > 0) {
-              const titles = payload.profile.target_titles
-                .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
-                .filter(Boolean)
-                .join(', ');
-              if (titles) savedBits.push(`Target titles → ${titles}`);
-            }
-            if (Array.isArray(payload.signal_preferences) && payload.signal_preferences.length > 0) {
-              const signals = payload.signal_preferences
-                .map((pref: any) => pref?.signal_type)
-                .filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
-                .join(', ');
-              if (signals) savedBits.push(`Signal alerts → ${signals}`);
-            }
-            if (Array.isArray(payload.custom_criteria) && payload.custom_criteria.length > 0) {
-              const criteria = payload.custom_criteria
-                .map((criterion: any) => criterion?.field_name)
-                .filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
-                .join(', ');
-              if (criteria) savedBits.push(`Custom criteria → ${criteria}`);
-            }
-
-            if (savedBits.length) {
-              confirmations.push(`All set — I captured: ${savedBits.join('; ')}.`);
-            } else {
-              confirmations.push('Saved your latest profile updates.');
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Error processing save command:', e);
-        addToast({ type: 'error', title: 'Profile save failed', description: 'Invalid save instruction. Please try again.' });
+        const result = await applySavePayload(payload);
+        confirmations.push(result.confirmation);
+        addToast({
+          type: 'success',
+          title: 'Profile updated',
+          description: result.summaryItems.length > 0
+            ? result.summaryItems.join('; ')
+            : 'Your preferences were saved.',
+        });
+      } catch (error: any) {
+        console.error('Error processing save command:', error);
+        addToast({
+          type: 'error',
+          title: 'Profile save failed',
+          description: error?.message || 'Invalid save instruction. Please try again.',
+        });
       }
     }
 
@@ -1852,18 +2156,35 @@ Onboarding flow:
                 ))}
 
                 {thinkingEvents.length > 0 && (() => {
+                  const latestStatus = [...thinkingEvents].reverse().find(e => e.type === 'status');
                   const latestReasoning = [...thinkingEvents].reverse().find(e => e.type === 'reasoning');
                   const latestWebSearch = [...thinkingEvents].reverse().find(e => e.type === 'web_search');
+                  const reasoningPreview = latestReasoning?.content
+                    ? latestReasoning.content
+                        .split('\n')
+                        .map(line => line.replace(/^-+\s*/, '').trim())
+                        .filter(Boolean)
+                        .pop()
+                    : null;
 
                   return (
                     <div className="space-y-2">
-                      {latestReasoning && (
-                        <ThinkingIndicator
-                          key={latestReasoning.id}
-                          type={latestReasoning.type}
-                          content={latestReasoning.content}
-                        />
+                      {(latestStatus || reasoningPreview) && (
+                        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-900">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full flex-shrink-0" />
+                            <span className="font-medium truncate">
+                              {latestStatus?.content || reasoningPreview || 'Analyzing your profile...'}
+                            </span>
+                          </div>
+                          {mockReasoningElapsed > 0 && (
+                            <span className="text-blue-600 font-mono text-xs">
+                              {Math.floor(mockReasoningElapsed / 60)}:{String(mockReasoningElapsed % 60).padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
                       )}
+                      {/* Hide separate reasoning block; inline banner shows live reasoning */}
                       {latestWebSearch && (
                         <ThinkingIndicator
                           key={latestWebSearch.id}
@@ -1908,7 +2229,67 @@ Onboarding flow:
 
         {currentChatId && !initializing && (
           <div className="bg-gray-50">
-            <div className="max-w-3xl mx-auto px-6 py-4">
+            <div className="max-w-3xl mx-auto px-6 py-4 space-y-4">
+              {pendingSaveSuggestions.length > 0 && (
+                <div className="space-y-3" role="region" aria-label="Pending profile updates">
+                  {pendingSaveSuggestions.map(suggestion => (
+                    <div
+                      key={suggestion.id}
+                      className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 text-amber-600">
+                            <Sparkles className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-amber-900">Profile update ready</h3>
+                            <p className="text-xs text-amber-800 mt-1">
+                              Captured from the latest suggestion. Apply it if it looks right.
+                            </p>
+                            {suggestion.summaryItems.length > 0 ? (
+                              <ul className="mt-3 space-y-1 text-sm text-amber-900 list-disc list-inside">
+                                {suggestion.summaryItems.map((item, idx) => (
+                                  <li key={`${suggestion.id}-summary-${idx}`}>{item}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-3 text-sm text-amber-900">
+                                The assistant prepared changes for your profile.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-shrink-0 sm:w-44">
+                          <button
+                            type="button"
+                            className={`inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                              applyingSuggestionId === suggestion.id
+                                ? 'bg-emerald-500/80 text-white cursor-wait'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            }`}
+                            onClick={() => { void handleApplyPendingSave(suggestion.id); }}
+                            disabled={applyingSuggestionId === suggestion.id}
+                          >
+                            <Check className="w-4 h-4" />
+                            Apply update
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                            onClick={() => handleDismissPendingSave(suggestion.id)}
+                            disabled={applyingSuggestionId === suggestion.id}
+                          >
+                            <X className="w-4 h-4" />
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <MessageInput
                 value={inputValue}
                 onChange={setInputValue}

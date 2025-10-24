@@ -45,8 +45,16 @@ export function HomeGate() {
     );
   }
 
+  const skipKey = user ? `skipHomeGate:${user.id}` : 'skipHomeGate';
   const canSkip = (() => {
-    try { return typeof window !== 'undefined' && window.localStorage?.getItem('skipHomeGate') === '1'; } catch { return false; }
+    try {
+      if (profileIncomplete) return false;
+      if (typeof window === 'undefined') return false;
+      const stored = window.localStorage?.getItem(skipKey) ?? window.localStorage?.getItem('skipHomeGate');
+      return stored === '1';
+    } catch {
+      return false;
+    }
   })();
 
   if (loading && !bypassGate && !canSkip) {
@@ -54,7 +62,9 @@ export function HomeGate() {
       <LoadingGate
         steps={loadingSteps}
         onContinueNow={() => {
-          try { window.localStorage?.setItem('skipHomeGate', '1'); } catch {}
+          try {
+            window.localStorage?.setItem(skipKey, '1');
+          } catch {}
           setBypassGate(true);
         }}
         onRetry={() => window.location.reload()}

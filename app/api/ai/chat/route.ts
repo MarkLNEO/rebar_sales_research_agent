@@ -256,8 +256,11 @@ export async function POST(req: NextRequest) {
           // Determine optimal reasoning effort for this request (considering research mode and follow-up status)
           const reasoningEffort = getReasoningEffort(agentType, lastUserMessage.content, research_type, is_follow_up);
 
-          // ALWAYS enable web search - follow-ups often need fresh data (competitors, news, etc)
-          const toolsArray = [{ type: 'web_search' as any }];
+          const webSearchPromptRegex = /(what's new|latest|recent|news|update|announcement|signal|breach|acquisition|happened|press release)/i;
+          const shouldEnableWebSearch = !is_follow_up && research_type !== 'specific'
+            ? true
+            : webSearchPromptRegex.test(lastUserMessage.content || '');
+          const toolsArray = shouldEnableWebSearch ? [{ type: 'web_search' as any }] : [];
 
           console.log('[chat] ============ CONVERSATION MODE DEBUG ============');
           console.log('[chat] is_follow_up:', is_follow_up);
@@ -286,7 +289,7 @@ export async function POST(req: NextRequest) {
             max_output_tokens: 12000, // Reduced from 16000 to prevent excessive token usage
 
             // Always enable web search - even follow-ups often need fresh data
-            tools: toolsArray,
+            ...(toolsArray.length > 0 ? { tools: toolsArray } : {}),
 
             // Use LOW reasoning effort by default per OpenAI best practices for fast TTFB
             // Skip reasoning config entirely if undefined (for follow-ups)
