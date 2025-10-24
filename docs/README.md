@@ -7,6 +7,14 @@ This folder consolidates the core documentation for the Sales Research Agent. Us
 - Conventions: `docs/Conventions.md`
 - Changelog: `docs/Changelog.md`
 
+## What’s new (highlights)
+
+- Unified reasoning indicator with ETA/progress (Task ≈ 1:00, Conversation ≈ 0:30)
+- Mobile: sidebar collapsed by default and opens as a full‑screen overlay; research sections are denser and scannable
+- Links and lists no longer overflow on phones; chips align and wrap naturally
+- P0 E2E guard: happy‑path smoke fails fast on any error toast/banner
+- Preferences API (`/api/preferences`): prevents 500s when saving research preferences
+
 ## Quickstart
 
 1. Install dependencies
@@ -35,3 +43,6 @@ This folder consolidates the core documentation for the Sales Research Agent. Us
 - Single, inline “reasoning” surface (no deprecated element)
 - Compact sidebar with visible “Recent Chats” and non‑conflicting chips
 
+## Legacy/Archived Reports (read‑only)
+
+The repository root contains historical reports (e.g., `UAT_FINAL_REPORT.md`, `CRITICAL_P0_FAILURE_ANALYSIS.md`). They remain for auditability but are not the source of truth. Prefer this docs hub; refer to legacy files only for historical context.
