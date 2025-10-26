@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 if [ "$ENFORCE_PREPUSH" != "1" ]; then
   echo "⏭️  Skipping pre-push checks (set ENFORCE_PREPUSH=1 to enable)"
   exit 0

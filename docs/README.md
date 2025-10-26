@@ -4,6 +4,7 @@ This folder consolidates the core documentation for the Sales Research Agent. Us
 
 - Architecture: `docs/Architecture.md`
 - Testing: `docs/Testing.md`
+- Contributing: `docs/CONTRIBUTING.md`
 - Conventions: `docs/Conventions.md`
 - Changelog: `docs/Changelog.md`
 
