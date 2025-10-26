@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 if [ "$ENFORCE_PREPUSH" != "1" ]; then
   echo "⏭️  Skipping pre-push checks (set ENFORCE_PREPUSH=1 to enable)"
   exit 0
@@ -23,5 +20,8 @@ if [ "$PREPUSH_SKIP_SMOKE" = "1" ]; then
 else
   npx playwright test -g @smoke --project=chromium || exit 1
 fi
+
+# Critical memory check (first-turn + 4-turn continuity)
+npx playwright test tests/memory.spec.ts -g "TC-MEM-000" --project=chromium || exit 1
 
 echo "✅ Pre-push checks passed"

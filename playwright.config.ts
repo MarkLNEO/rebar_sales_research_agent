@@ -54,8 +54,8 @@ export default defineConfig({
   },
 
   use: {
-    // Base URL for all tests
-    baseURL: process.env.TEST_BASE_URL || 'https://rebar-sales-research-agent.vercel.app',
+    // Base URL for all tests (default to local dev when webServer runs)
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:3000',
 
     // Collect trace on first retry
     trace: 'on-first-retry',

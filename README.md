@@ -5,10 +5,11 @@ AI‑powered company research with exact terminology, consistent scoring, and co
 ## 📚 Docs
 
 - docs/README.md – Quickstart, environment, and common tasks
-- docs/Architecture.md – Agents, prompts, context loader, Responses API
-- docs/Testing.md – Unit + Playwright, local vs CI, debug tips
+- docs/E2E_TESTING_STRATEGY.md – E2E test design, when it runs, how to debug
 - docs/Conventions.md – Code style, naming, folder layout
+- docs/Architecture.md – Agents, prompts, context loader, Responses API
 - docs/Changelog.md – High‑level product changes and rationale
+- More historical notes in `docs/legacy/`
 
 ## Quick Start
 
