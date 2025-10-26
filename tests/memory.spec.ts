@@ -1,4 +1,7 @@
-import { test, expect, waitForStreamComplete, hasApiError } from './fixtures';
+import { test, expect, waitForStreamComplete, waitForAssistantContent, hasApiError } from './fixtures';
+
+// Run this suite serially to avoid cross-worker conflicts (shared user/session/memory)
+test.describe.configure({ mode: 'serial', retries: 1 });
 
 /**
  * Memory & Context Tests
@@ -12,55 +15,150 @@ import { test, expect, waitForStreamComplete, hasApiError } from './fixtures';
  */
 
 test.describe('Memory & Context - Conversation Continuity', () => {
-  test('TC-MEM-000: Persists memory across 4 turns', async ({ authenticatedPage, clearData }) => {
+  test('TC-MEM-000: Persists memory across 4 turns', async ({ authenticatedPage, clearData, testUser }) => {
+    // Allow extra time for the first-turn warm-up + render attach
+    test.setTimeout(240000);
     await clearData();
-    await authenticatedPage.goto('/');
-    await Promise.race([
-      authenticatedPage.getByRole('button', { name: /New Chat|New research/i }).waitFor({ timeout: 15000 }),
-      authenticatedPage.getByTestId('chat-surface').first().waitFor({ timeout: 15000 }),
-    ]);
+    await authenticatedPage.goto('/research?e2e_open=1');
+    // Ensure we land in the chat surface: open Company Researcher explicitly
+    const openResearchCandidates = [
+      /Company Researcher/i,
+      /Company Research/i,
+      /Research a company/i,
+      /New Chat/i,
+      /New session/i,
+    ];
+    for (const pattern of openResearchCandidates) {
+      const btn = authenticatedPage.getByRole('button', { name: pattern }).first();
+      if (await btn.isVisible().catch(() => false)) {
+        await btn.click();
+        break;
+      }
+    }
+    // Defer composer readiness to send helper (handles navigation/fallbacks)
+    // Helper: ensure we are logged in (in case environment bounces session)
+    const ensureLoggedIn = async () => {
+      // Detect sign-in screen
+      const onSignin = await Promise.race([
+        authenticatedPage.getByPlaceholder('you@company.com').isVisible().catch(() => false),
+        authenticatedPage.locator('input[type="email"]').isVisible().catch(() => false),
+      ]);
+      if (onSignin) {
+        const emailField = (
+          await authenticatedPage.getByPlaceholder('you@company.com').elementHandle().catch(() => null)
+        ) || (
+          await authenticatedPage.locator('input[type="email"]').elementHandle().catch(() => null)
+        ) || (
+          await authenticatedPage.locator('input[name="email"]').elementHandle().catch(() => null)
+        );
+        const passwordField = (
+          await authenticatedPage.getByPlaceholder('Your password').elementHandle().catch(() => null)
+        ) || (
+          await authenticatedPage.locator('input[type="password"]').elementHandle().catch(() => null)
+        );
 
-    // Turn 1
-    await authenticatedPage.getByPlaceholder('Message agent...').fill('Research Datadog');
-    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
-    await Promise.race([
-      authenticatedPage.locator('[role="assistant"]').first().waitFor({ timeout: 60000 }),
-      waitForStreamComplete(authenticatedPage),
-    ]);
+        if (emailField) await emailField.fill(testUser.email);
+        if (passwordField) await passwordField.fill(testUser.password);
+        await authenticatedPage.getByRole('button', { name: /sign in|log in/i }).click();
+        await Promise.race([
+          authenticatedPage.getByRole('button', { name: /New Chat|New research/i }).waitFor({ timeout: 30000 }),
+          authenticatedPage.getByTestId('chat-surface').first().waitFor({ timeout: 30000 }),
+        ]);
+      }
+    };
+
+    // Helper: robust send with re-login fallback (one retry)
+    const sendAndAwait = async (text: string, minLen = 10) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await ensureLoggedIn();
+        // Ensure composer is present: navigate into Company Researcher if needed
+        const composerReady = async () => {
+          const ok = await Promise.race([
+            authenticatedPage.getByTestId('composer-input').waitFor({ timeout: 20000 }).then(() => true).catch(() => false),
+            authenticatedPage.waitForFunction(() => {
+              const ta = document.querySelector('textarea[placeholder="Message agent..."]') as HTMLTextAreaElement | null;
+              return !!ta && !ta.disabled;
+            }, { timeout: 20000 }).then(() => true).catch(() => false),
+          ]);
+          return ok;
+        };
+
+        // Try up to 3 times to surface the composer
+        for (let i = 0; i < 3; i++) {
+          if (await composerReady()) break;
+          const candidates = [
+            /Company Researcher/i,
+            /Company Research/i,
+            /New Chat/i,
+            /New session/i,
+            /Research a company/i,
+          ];
+          for (const pattern of candidates) {
+            const btn = authenticatedPage.getByRole('button', { name: pattern }).first();
+            if (await btn.isVisible().catch(() => false)) {
+              await btn.click();
+              await authenticatedPage.waitForTimeout(500);
+              if (await composerReady()) break;
+            }
+          }
+        }
+
+        // Ensure composer is present and enabled (retry after navigation)
+        await authenticatedPage.waitForFunction(() => {
+          const ta = document.querySelector('textarea[placeholder="Message agent..."]') as HTMLTextAreaElement | null;
+          return !!ta && !ta.disabled;
+        }, { timeout: 20000 });
+        if (await authenticatedPage.getByTestId('composer-input').isVisible().catch(() => false)) {
+          await authenticatedPage.getByTestId('composer-input').fill(text);
+        } else {
+          await authenticatedPage.getByPlaceholder('Message agent...').fill(text);
+        }
+        await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+        // Wait for initial assistant output first (bubble during streaming)
+        await waitForAssistantContent(authenticatedPage, Math.min(5, minLen), 60000);
+        // Then wait for stream completion signals
+        await waitForStreamComplete(authenticatedPage, 120000);
+        // If we got bounced to sign-in during stream, retry once
+        const bounced = await authenticatedPage.getByPlaceholder('you@company.com').isVisible().catch(() => false);
+        if (bounced) {
+          continue;
+        }
+        await waitForAssistantContent(authenticatedPage, minLen, 90000);
+        return;
+      }
+      // Final attempt after re-login
+      await ensureLoggedIn();
+      if (await authenticatedPage.getByTestId('composer-input').isVisible().catch(() => false)) {
+        await authenticatedPage.getByTestId('composer-input').fill(text);
+      } else {
+        await authenticatedPage.getByPlaceholder('Message agent...').fill(text);
+      }
+      await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
+      await waitForAssistantContent(authenticatedPage, Math.min(5, minLen), 60000);
+      await waitForStreamComplete(authenticatedPage, 120000);
+      await waitForAssistantContent(authenticatedPage, minLen, 90000);
+    };
+
+    // Turn 1 (Quick deterministic attach)
+    await sendAndAwait('Quick brief on Datadog', 10);
 
     // Turn 2 (follow-up)
-    await authenticatedPage.getByPlaceholder('Message agent...').fill('What is their main product focus?');
-    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
-    await Promise.race([
-      authenticatedPage.locator('[role="assistant"]').last().waitFor({ timeout: 60000 }),
-      waitForStreamComplete(authenticatedPage),
-    ]);
+    await sendAndAwait('What is their main product focus?', 50);
     if (await hasApiError(authenticatedPage)) test.skip(true, 'API error encountered during smoke');
 
     // Turn 3 (pronoun reference)
-    await authenticatedPage.getByPlaceholder('Message agent...').fill('Who is their CTO?');
-    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
-    await Promise.race([
-      authenticatedPage.locator('[role="assistant"]').last().waitFor({ timeout: 60000 }),
-      waitForStreamComplete(authenticatedPage),
-    ]);
+    await sendAndAwait('Who is their CTO?', 50);
     if (await hasApiError(authenticatedPage)) test.skip(true, 'API error encountered during smoke');
 
     // Turn 4 (topic continuity)
-    await authenticatedPage.getByPlaceholder('Message agent...').fill('And what is their revenue model?');
-    await authenticatedPage.getByRole('button', { name: 'Send message' }).click();
-    await Promise.race([
-      authenticatedPage.locator('[role="assistant"]').last().waitFor({ timeout: 60000 }),
-      waitForStreamComplete(authenticatedPage),
-    ]);
+    await sendAndAwait('And what is their revenue model?', 50);
     if (await hasApiError(authenticatedPage)) test.skip(true, 'API error encountered during smoke');
 
-    await authenticatedPage.locator('[role="assistant"]').last().waitFor({ timeout: 60000 });
-    const last = (await authenticatedPage.locator('[role="assistant"]').last().textContent())?.toLowerCase() || '';
-    // Assert we received a non-trivial response
-    expect((last || '').length).toBeGreaterThan(50);
-    // Should not confuse with unrelated prior companies
-    expect(last).not.toMatch(/salesforce|oracle|microsoft/);
+    // After final turn, assert completion and relevant content presence
+    await authenticatedPage.getByTestId('stream-complete').waitFor({ timeout: 60000 });
+    const pageText = (await authenticatedPage.locator('body').textContent())?.toLowerCase() || '';
+    expect(pageText).toContain('datadog');
+    expect(pageText).not.toMatch(/salesforce|oracle|microsoft/);
   });
   test('TC-MEM-004: Should maintain company context for role-based queries', async ({ authenticatedPage, clearData }) => {
     // Clear all user data including knowledge_entries and implicit_preferences

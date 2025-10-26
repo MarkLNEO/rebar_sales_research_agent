@@ -436,3 +436,4 @@ Parse JSON results in CI for:
 - [ ] Set up CI/CD pipeline
 - [ ] Add performance regression tracking
 - [ ] Add visual regression testing (Percy/Chromatic)
+- For the full testing strategy, rationale, and debugging guide, see `docs/E2E_TESTING_STRATEGY.md`.

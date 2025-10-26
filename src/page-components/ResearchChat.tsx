@@ -577,6 +577,8 @@ export function ResearchChat() {
     };
   }, []);
 
+  // (moved below ensureActiveChat to avoid TDZ) E2E test hook inserted later
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoSentRef = useRef(false);
   const reasoningBufferRef = useRef<string>('');
@@ -3590,6 +3592,22 @@ useEffect(() => {
     if (currentChatId) return currentChatId;
     return await createNewChat();
   }, [createNewChat, currentChatId]);
+
+  // E2E test hook: ensure composer is present by opening/creating a chat
+  useEffect(() => {
+    try {
+      const openFlag = searchParams?.get('e2e_open');
+      if (openFlag && !currentChatId) {
+        void (async () => {
+          try {
+            const id = await ensureActiveChat();
+            if (id) setFocusComposerTick(t => t + 1);
+          } catch {}
+        })();
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, ensureActiveChat, currentChatId]);
 
   // Next Actions helpers
   const handleStartNewCompany = useCallback(async () => {

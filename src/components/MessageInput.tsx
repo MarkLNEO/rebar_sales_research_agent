@@ -97,6 +97,7 @@ export function MessageInput({
         rows={1}
         className="w-full resize-none border-none outline-none text-gray-900 placeholder-gray-400 text-sm"
         style={{ minHeight: '24px', maxHeight: '200px', overflowY: 'hidden', overflowX: 'hidden' }}
+        data-testid="composer-input"
         aria-label={placeholder || 'Message agent'}
       />
 

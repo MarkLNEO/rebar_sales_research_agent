@@ -45,4 +45,4 @@ This folder consolidates the core documentation for the Sales Research Agent. Us
 
 ## Legacy/Archived Reports (read‑only)
 
-The repository root contains historical reports (e.g., `UAT_FINAL_REPORT.md`, `CRITICAL_P0_FAILURE_ANALYSIS.md`). They remain for auditability but are not the source of truth. Prefer this docs hub; refer to legacy files only for historical context.
+Historical reports and one‑off analyses have been consolidated under `docs/legacy/` (e.g., `UAT_FINAL_REPORT.md`, `CRITICAL_P0_FAILURE_ANALYSIS.md`). They remain for auditability but are not the source of truth. Prefer this docs hub; refer to legacy files only for historical context.

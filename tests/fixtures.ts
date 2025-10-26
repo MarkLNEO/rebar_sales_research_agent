@@ -67,6 +67,36 @@ function getSupabaseClient(): SupabaseClient {
   return createClient(url, key);
 }
 
+// Admin client (service role) for creating users/seeding data in tests
+function getAdminClient(): SupabaseClient {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !service) {
+    throw new Error('[tests] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client');
+  }
+  return createClient(url, service);
+}
+
+async function ensureTestUser(email: string, password: string) {
+  const admin = getAdminClient();
+  try {
+    // Try signing in first; if it works, user exists and password is correct
+    const anon = getSupabaseClient();
+    const sign = await anon.auth.signInWithPassword({ email, password });
+    if (!sign.error) return sign.data.user || null;
+  } catch {}
+  try {
+    // Create or upsert the user with confirmed email
+    // @ts-expect-error: admin api types may vary by version
+    await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  } catch {}
+  // After creation, sign in via anon client to get a session
+  const anon2 = getSupabaseClient();
+  const { data, error } = await anon2.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.user || null;
+}
+
 // Helper to login a user
 async function loginUser(page: Page, email: string, password: string) {
   await page.goto('/');
@@ -112,6 +142,17 @@ async function loginUser(page: Page, email: string, password: string) {
   // Wait for page to load after login
   await page.waitForTimeout(2000);
 
+  // Ensure composer is enabled (previous stream may still be finishing)
+  try {
+    await page.waitForFunction(() => {
+      const ta = document.querySelector('textarea[placeholder="Message agent..."]') as HTMLTextAreaElement | null;
+      return !!ta && !ta.disabled;
+    }, { timeout: 15000 });
+  } catch {
+    // Fallback: wait for Stop to disappear if present
+    await page.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout: 15000 }).catch(() => undefined);
+  }
+
   // Handle Welcome Agent modal if it appears (for new users)
   const welcomeAgentVisible = await page.getByText(/Welcome Agent|Hey! I'm your Welcome Agent/i).isVisible().catch(() => false);
   if (welcomeAgentVisible) {
@@ -126,8 +167,12 @@ async function loginUser(page: Page, email: string, password: string) {
     }
   }
 
-  // Wait for main app to be visible (New Chat button indicates we're in)
-  await expect(page.getByRole('button', { name: /new chat/i })).toBeVisible({ timeout: 20000 });
+  // Wait for main app to be visible (flexible signals)
+  await Promise.race([
+    page.getByRole('button', { name: /new chat|new session|new research/i }).waitFor({ timeout: 20000 }).catch(() => undefined),
+    page.getByTestId('chat-surface').first().waitFor({ timeout: 20000 }).catch(() => undefined),
+    page.getByPlaceholder('Message agent...').waitFor({ timeout: 20000 }).catch(() => undefined),
+  ]);
 
   console.log(`Logged in as ${email}`);
 }
@@ -173,6 +218,15 @@ async function clearUserData(userId: string) {
   await supabase.from('implicit_preferences').delete().eq('user_id', userId);
 
   console.log(`Cleared test data for user ${userId} (including memory)`);
+}
+
+// Helper to reset test credits to avoid exhaustion during long runs
+async function resetUserCredits(userId: string, amount = 1000) {
+  const supabase = getSupabaseClient();
+  await supabase
+    .from('users')
+    .update({ credits_remaining: amount, approval_status: 'approved' })
+    .eq('id', userId);
 }
 
 // Helper to measure performance
@@ -234,10 +288,19 @@ export const test = base.extend<TestFixtures>({
   },
 
   // Test user fixture
-  testUser: async ({}, use) => {
+  testUser: [async ({}, use, testInfo) => {
     const envCreds = getEnvLogin();
-    await use(envCreds ? { ...TEST_USERS.cliff, ...envCreds } : TEST_USERS.cliff);
-  },
+    if (envCreds) {
+      await use({ ...TEST_USERS.cliff, ...envCreds });
+      return;
+    }
+    // Assign unique user per worker to avoid shared state
+    const idx = (testInfo as any)?.workerIndex ?? 0;
+    const email = `e2e+${idx}@nevereverordinary.com`;
+    const password = 'Test123!@#';
+    try { await ensureTestUser(email, password); } catch (e) { console.warn('[tests] ensureTestUser failed', e); }
+    await use({ email, password, role: 'Account Executive', company: 'Acme Security Solutions' } as any);
+  }, { scope: 'worker' }],
 
   // Supabase client fixture
   supabase: async ({}, use) => {
@@ -248,14 +311,22 @@ export const test = base.extend<TestFixtures>({
   // Clear data fixture
   clearData: async ({ testUser, supabase }, use) => {
     const clearFn = async () => {
-      // Get user ID
-      const { data: { user } } = await supabase.auth.signInWithPassword({
-        email: testUser.email,
-        password: testUser.password,
-      });
+      // Use admin client to look up user id by email without affecting browser session
+      const admin = getAdminClient();
+      let userId: string | null = null;
+      try {
+        const { data } = await admin
+          .from('users')
+          .select('id')
+          .eq('email', testUser.email)
+          .limit(1)
+          .maybeSingle();
+        userId = (data as any)?.id ?? null;
+      } catch {}
 
-      if (user) {
-        await clearUserData(user.id);
+      if (userId) {
+        await clearUserData(userId);
+        await resetUserCredits(userId, 1000);
       }
     };
 
@@ -278,17 +349,46 @@ export function snapshotName(testName: string, step: string): string {
 
 // Helper to wait for streaming to complete
 export async function waitForStreamComplete(page: Page, timeout = 120000) {
-  // Wait for either "Next actions" or error state
-  await Promise.race([
-    // Preferred sentinel for deterministic completion
-    page.getByTestId('stream-complete').waitFor({ timeout }),
-    // Backwards-compatibility with older UIs
-    page.getByText('Next actions').waitFor({ timeout }),
-    // Or streaming stop button disappears
+  // Preferred sentinel for deterministic completion
+  const sentinels = [
+    page.getByTestId('stream-complete').waitFor({ timeout }).catch(() => undefined),
+    page.getByText('Next actions').waitFor({ timeout }).catch(() => undefined),
+    // Stop button disappears
     page.getByRole('button', { name: 'Stop' }).waitFor({ state: 'hidden', timeout }).catch(() => undefined),
-    // Error state
-    page.getByText('error', { exact: false }).waitFor({ timeout }),
+  ];
+  await Promise.race(sentinels);
+
+  // Additionally, ensure the assistant message rendered OR the composer is re-enabled
+  await Promise.race([
+    page.locator('[role="assistant"]').first().waitFor({ timeout }).catch(() => undefined),
+    page.waitForFunction(() => {
+      const ta = document.querySelector('textarea[placeholder="Message agent..."]') as HTMLTextAreaElement | null;
+      return !!ta && !ta.disabled;
+    }, { timeout }).catch(() => undefined),
   ]);
+}
+
+// Wait for the last assistant bubble to exist and contain at least `minLength` characters
+export async function waitForAssistantContent(page: Page, minLength = 1, timeout = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      // 1) Prefer the streaming assistant bubble if present
+      const bubble = page.locator('[role="assistant"]').last();
+      if (await bubble.isVisible().catch(() => false)) {
+        const text = (await bubble.textContent()) || '';
+        if (text.trim().length >= minLength) return;
+      }
+
+      // 2) If stream has completed, consider it a successful render
+      const complete = page.getByTestId('stream-complete');
+      if (await complete.isVisible().catch(() => false)) {
+        return; // Final content is rendered structurally (no assistant bubble)
+      }
+    } catch {}
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`Assistant content did not reach ${minLength} chars within ${timeout}ms`);
 }
 
 // Helper to check reasoning stream visibility

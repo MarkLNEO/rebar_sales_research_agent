@@ -24,4 +24,7 @@ else
   npx playwright test -g @smoke --project=chromium || exit 1
 fi
 
+# Critical memory check (first-turn + 4-turn continuity)
+npx playwright test tests/memory.spec.ts -g "TC-MEM-000" --project=chromium || exit 1
+
 echo "✅ Pre-push checks passed"
