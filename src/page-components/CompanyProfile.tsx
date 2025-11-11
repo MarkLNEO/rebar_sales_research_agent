@@ -1765,7 +1765,13 @@ Onboarding flow:
                                 rel="noreferrer"
                                 className="block text-xs text-blue-600 hover:underline"
                               >
-                                {profileData.company_url}
+                                {(() => {
+                                  try {
+                                    return decodeURIComponent(String(profileData.company_url));
+                                  } catch {
+                                    return String(profileData.company_url);
+                                  }
+                                })()}
                               </a>
                             )}
                           </dd>

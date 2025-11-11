@@ -387,7 +387,13 @@ export function ResearchOutput({ research, onExportPDF, onExportCSV }: ResearchO
                   rel="noopener noreferrer"
                   className="font-medium text-blue-600 hover:underline block"
                 >
-                  {research.company_data.website}
+                  {(() => {
+                    try {
+                      return decodeURIComponent(String(research.company_data.website));
+                    } catch {
+                      return String(research.company_data.website);
+                    }
+                  })()}
                 </a>
               </div>
             )}

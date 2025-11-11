@@ -556,7 +556,13 @@ export function Settings() {
                       rel="noopener noreferrer"
                       className="text-blue-700 hover:text-blue-700"
                     >
-                      {profile.company.company_url}
+                      {(() => {
+                        try {
+                          return decodeURIComponent(profile.company.company_url);
+                        } catch {
+                          return profile.company.company_url;
+                        }
+                      })()}
                     </a>
                   </div>
                 )}
